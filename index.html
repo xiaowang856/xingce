@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>公考复习小程序</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">考</div>
+        <div>
+          <h1>公考复习</h1>
+          <p>行测 · 申论 · 成语</p>
+        </div>
+      </div>
+      <nav class="nav" aria-label="主导航">
+        <button class="nav-btn active" data-view="dashboard">总览</button>
+        <button class="nav-btn" data-view="daily">每日打卡</button>
+        <button class="nav-btn" data-view="mistakes">行测错题</button>
+        <button class="nav-btn" data-view="shenlun">申论练习</button>
+        <button class="nav-btn" data-view="idioms">成语积累</button>
+        <button class="nav-btn" data-view="resources">网站资源</button>
+      </nav>
+      <div class="sidebar-note">
+        <strong>本地保存</strong>
+        <span>新增记录会保存在当前浏览器。</span>
+      </div>
+    </aside>
+
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Civil Service Study</p>
+          <h2 id="viewTitle">总览</h2>
+        </div>
+        <div class="top-actions">
+          <button id="exportJsonBtn" class="ghost-btn">导出数据</button>
+          <button id="resetBtn" class="ghost-btn danger">清空本地记录</button>
+        </div>
+      </header>
+
+      <section id="dashboard" class="view active">
+        <div class="metric-grid">
+          <article class="metric">
+            <span>成语总数</span>
+            <strong id="idiomCount">0</strong>
+          </article>
+          <article class="metric">
+            <span>今日打卡</span>
+            <strong id="todayStatus">未记录</strong>
+          </article>
+          <article class="metric">
+            <span>错题记录</span>
+            <strong id="mistakeCount">0</strong>
+          </article>
+          <article class="metric">
+            <span>申论练习</span>
+            <strong id="shenlunCount">0</strong>
+          </article>
+        </div>
+        <div class="panel-grid">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>复习重点</h3>
+            </div>
+            <div id="focusList" class="focus-list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head">
+              <h3>周计划</h3>
+            </div>
+            <div id="weeklyPlan" class="week-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="daily" class="view">
+        <section class="panel">
+          <div class="panel-head">
+            <h3>新增每日打卡</h3>
+          </div>
+          <form id="dailyForm" class="form-grid">
+            <label>日期<input name="date" type="date" required /></label>
+            <label>学习时长<input name="minutes" type="number" min="0" placeholder="分钟" /></label>
+            <label>行测模块
+              <select name="module">
+                <option>资料分析</option>
+                <option>判断推理</option>
+                <option>言语理解</option>
+                <option>数量关系</option>
+                <option>常识判断</option>
+                <option>套卷训练</option>
+                <option>混合训练</option>
+              </select>
+            </label>
+            <label>题量<input name="total" type="number" min="0" /></label>
+            <label>正确数<input name="correct" type="number" min="0" /></label>
+            <label>申论任务<input name="shenlunTask" type="text" placeholder="如：归纳概括1题" /></label>
+            <label class="wide">今日问题<input name="problem" type="text" placeholder="错因、拖慢速度的点" /></label>
+            <label class="wide">明日调整<input name="adjust" type="text" placeholder="明天怎么改" /></label>
+            <button class="primary-btn" type="submit">保存打卡</button>
+          </form>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <h3>打卡记录</h3>
+            <input id="dailySearch" class="search" placeholder="搜索模块/问题" />
+          </div>
+          <div id="dailyTable" class="table-wrap"></div>
+        </section>
+      </section>
+
+      <section id="mistakes" class="view">
+        <section class="panel">
+          <div class="panel-head"><h3>新增行测错题</h3></div>
+          <form id="mistakeForm" class="form-grid">
+            <label>日期<input name="date" type="date" required /></label>
+            <label>模块
+              <select name="module">
+                <option>言语理解</option>
+                <option>数量关系</option>
+                <option>判断推理</option>
+                <option>资料分析</option>
+                <option>常识判断</option>
+              </select>
+            </label>
+            <label>题型<input name="type" type="text" placeholder="如：逻辑填空" /></label>
+            <label>错因
+              <select name="reason">
+                <option>不会</option>
+                <option>粗心</option>
+                <option>读错题</option>
+                <option>时间不够</option>
+                <option>方法不熟</option>
+                <option>计算错误</option>
+              </select>
+            </label>
+            <label class="wide">正确方法/公式<input name="method" type="text" /></label>
+            <label class="wide">题源链接<input name="source" type="text" /></label>
+            <button class="primary-btn" type="submit">保存错题</button>
+          </form>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <h3>错题列表</h3>
+            <input id="mistakeSearch" class="search" placeholder="搜索模块/错因/方法" />
+          </div>
+          <div id="mistakeTable" class="table-wrap"></div>
+        </section>
+      </section>
+
+      <section id="shenlun" class="view">
+        <section class="panel">
+          <div class="panel-head"><h3>新增申论练习</h3></div>
+          <form id="shenlunForm" class="form-grid">
+            <label>日期<input name="date" type="date" required /></label>
+            <label>题型
+              <select name="type">
+                <option>归纳概括</option>
+                <option>提出对策</option>
+                <option>综合分析</option>
+                <option>贯彻执行</option>
+                <option>公文题</option>
+                <option>大作文</option>
+                <option>整套真题</option>
+              </select>
+            </label>
+            <label>材料主题<input name="topic" type="text" /></label>
+            <label>自评分<input name="score" type="number" min="0" max="100" /></label>
+            <label class="wide">主要漏点<input name="miss" type="text" /></label>
+            <label class="wide">修改后要点<input name="rewrite" type="text" /></label>
+            <label class="wide">参考链接<input name="link" type="text" /></label>
+            <button class="primary-btn" type="submit">保存申论记录</button>
+          </form>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <h3>申论记录</h3>
+            <input id="shenlunSearch" class="search" placeholder="搜索题型/主题/漏点" />
+          </div>
+          <div id="shenlunTable" class="table-wrap"></div>
+        </section>
+      </section>
+
+      <section id="idioms" class="view">
+        <section class="panel">
+          <div class="panel-head">
+            <h3>成语查询</h3>
+            <div class="filters">
+              <input id="idiomSearch" class="search" placeholder="搜索成语/含义/易错点" />
+              <select id="idiomTone">
+                <option value="">全部色彩</option>
+                <option>褒义</option>
+                <option>贬义</option>
+                <option>中性</option>
+              </select>
+              <select id="idiomStatus">
+                <option value="">全部状态</option>
+                <option>未掌握</option>
+                <option>需复习</option>
+                <option>已掌握</option>
+              </select>
+            </div>
+          </div>
+          <div id="idiomCards" class="idiom-grid"></div>
+        </section>
+      </section>
+
+      <section id="resources" class="view">
+        <div class="panel-grid">
+          <section class="panel">
+            <div class="panel-head"><h3>申论素材网站</h3></div>
+            <div id="shenlunSites" class="resource-list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h3>行测练习网站</h3></div>
+            <div id="xingceSites" class="resource-list"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

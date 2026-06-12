@@ -1,0 +1,426 @@
+const STORAGE_KEY = "civil-service-study-state-v1";
+
+const state = {
+  base: null,
+  local: {
+    daily: [],
+    mistakes: [],
+    shenlun: [],
+    idiomStatus: {},
+  },
+};
+
+const titles = {
+  dashboard: "总览",
+  daily: "每日打卡",
+  mistakes: "行测错题",
+  shenlun: "申论练习",
+  idioms: "成语积累",
+  resources: "网站资源",
+};
+
+function $(selector) {
+  return document.querySelector(selector);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function loadLocal() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return;
+  try {
+    state.local = { ...state.local, ...JSON.parse(raw) };
+  } catch {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+}
+
+function saveLocal() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.local));
+}
+
+function normalizeDaily(row) {
+  const total = Number(row["行测题量"] || row.total || 0);
+  const correct = Number(row["行测正确数"] || row.correct || 0);
+  const rate = total > 0 ? `${Math.round((correct / total) * 1000) / 10}%` : "";
+  return {
+    date: row["日期"] || row.date || "",
+    minutes: row["学习时长(分钟)"] || row.minutes || "",
+    module: row["行测模块"] || row.module || "",
+    total,
+    correct,
+    rate,
+    shenlunTask: row["申论任务"] || row.shenlunTask || "",
+    problem: row["今日主要问题"] || row.problem || "",
+    adjust: row["明日调整"] || row.adjust || "",
+  };
+}
+
+function normalizeMistake(row) {
+  return {
+    date: row["日期"] || row.date || "",
+    module: row["模块"] || row.module || "",
+    type: row["题型"] || row.type || "",
+    reason: row["错因"] || row.reason || "",
+    method: row["正确方法/公式"] || row.method || "",
+    source: row["练习网站/题源链接"] || row.source || "",
+  };
+}
+
+function normalizeShenlun(row) {
+  return {
+    date: row["日期"] || row.date || "",
+    type: row["题型"] || row.type || "",
+    topic: row["材料主题"] || row.topic || "",
+    score: row["自评分"] || row.score || "",
+    miss: row["主要漏点"] || row.miss || "",
+    rewrite: row["修改后要点"] || row.rewrite || "",
+    link: row["参考网站/文章链接"] || row.link || "",
+  };
+}
+
+function allDaily() {
+  return [...state.base.dailyCheckin.map(normalizeDaily), ...state.local.daily];
+}
+
+function allMistakes() {
+  return [
+    ...state.base.examMistakes.map(normalizeMistake).filter((row) => row.date || row.module || row.type || row.reason),
+    ...state.local.mistakes,
+  ];
+}
+
+function allShenlun() {
+  return [
+    ...state.base.shenlunPractice.map(normalizeShenlun).filter((row) => row.date || row.type || row.topic || row.miss),
+    ...state.local.shenlun,
+  ];
+}
+
+function switchView(viewName) {
+  document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach((button) => button.classList.remove("active"));
+  $(`#${viewName}`).classList.add("active");
+  document.querySelector(`[data-view="${viewName}"]`).classList.add("active");
+  $("#viewTitle").textContent = titles[viewName];
+}
+
+function renderDashboard() {
+  $("#idiomCount").textContent = state.base.idioms.length;
+  $("#mistakeCount").textContent = allMistakes().length;
+  $("#shenlunCount").textContent = allShenlun().length;
+  const todayRecord = allDaily().find((row) => row.date === today());
+  $("#todayStatus").textContent = todayRecord ? "已记录" : "未记录";
+
+  $("#focusList").innerHTML = state.base.focusList
+    .slice(0, 8)
+    .map(
+      (item) => `
+        <article class="focus-item">
+          <strong>${escapeHtml(item["科目"])} · ${escapeHtml(item["模块/题型"])}</strong>
+          <p>${escapeHtml(item["训练目标"])}</p>
+          <div class="tag-row">
+            <span class="tag good">${escapeHtml(item["优先级"])}</span>
+            <span class="tag">${escapeHtml(item["阶段"])}</span>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+
+  $("#weeklyPlan").innerHTML = state.base.weeklyPlan
+    .slice(0, 6)
+    .map(
+      (item) => `
+        <article class="week-item">
+          <strong>第${escapeHtml(item["周次"])}周 · ${escapeHtml(item["阶段"])}</strong>
+          <p>${escapeHtml(item["行测任务"])}</p>
+          <p>${escapeHtml(item["申论任务"])}</p>
+          <div class="tag-row">
+            <span class="tag warn">${escapeHtml(item["套卷/模考"])}</span>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function table(headers, rows) {
+  if (!rows.length) {
+    return `<div class="focus-item"><p>暂无记录。</p></div>`;
+  }
+  return `
+    <table>
+      <thead><tr>${headers.map((header) => `<th>${escapeHtml(header.label)}</th>`).join("")}</tr></thead>
+      <tbody>
+        ${rows
+          .map(
+            (row) => `
+              <tr>
+                ${headers.map((header) => `<td>${escapeHtml(row[header.key])}</td>`).join("")}
+              </tr>
+            `,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function includesRow(row, keyword) {
+  if (!keyword) return true;
+  return Object.values(row).join(" ").toLowerCase().includes(keyword.toLowerCase());
+}
+
+function renderDaily() {
+  const keyword = $("#dailySearch").value.trim();
+  const rows = allDaily().filter((row) => includesRow(row, keyword));
+  $("#dailyTable").innerHTML = table(
+    [
+      { key: "date", label: "日期" },
+      { key: "minutes", label: "时长" },
+      { key: "module", label: "模块" },
+      { key: "total", label: "题量" },
+      { key: "correct", label: "正确" },
+      { key: "rate", label: "正确率" },
+      { key: "shenlunTask", label: "申论任务" },
+      { key: "problem", label: "问题" },
+      { key: "adjust", label: "调整" },
+    ],
+    rows,
+  );
+}
+
+function renderMistakes() {
+  const keyword = $("#mistakeSearch").value.trim();
+  const rows = allMistakes().filter((row) => includesRow(row, keyword));
+  $("#mistakeTable").innerHTML = table(
+    [
+      { key: "date", label: "日期" },
+      { key: "module", label: "模块" },
+      { key: "type", label: "题型" },
+      { key: "reason", label: "错因" },
+      { key: "method", label: "正确方法" },
+      { key: "source", label: "题源" },
+    ],
+    rows,
+  );
+}
+
+function renderShenlun() {
+  const keyword = $("#shenlunSearch").value.trim();
+  const rows = allShenlun().filter((row) => includesRow(row, keyword));
+  $("#shenlunTable").innerHTML = table(
+    [
+      { key: "date", label: "日期" },
+      { key: "type", label: "题型" },
+      { key: "topic", label: "主题" },
+      { key: "score", label: "自评分" },
+      { key: "miss", label: "主要漏点" },
+      { key: "rewrite", label: "修改后要点" },
+      { key: "link", label: "参考链接" },
+    ],
+    rows,
+  );
+}
+
+function idiomStatus(idiom) {
+  return state.local.idiomStatus[idiom["成语"]] || idiom["掌握状态"] || "未掌握";
+}
+
+function renderIdioms() {
+  const keyword = $("#idiomSearch").value.trim().toLowerCase();
+  const tone = $("#idiomTone").value;
+  const status = $("#idiomStatus").value;
+  const rows = state.base.idioms.filter((item) => {
+    const text = Object.values(item).join(" ").toLowerCase();
+    const toneOk = !tone || String(item["感情色彩"] || "").includes(tone);
+    const statusOk = !status || idiomStatus(item) === status;
+    return text.includes(keyword) && toneOk && statusOk;
+  });
+
+  $("#idiomCards").innerHTML = rows
+    .map((item) => {
+      const current = idiomStatus(item);
+      return `
+        <article class="idiom-card">
+          <strong>${escapeHtml(item["成语"])}</strong>
+          <p>${escapeHtml(item["常见含义"])}</p>
+          <p><b>易错：</b>${escapeHtml(item["易错点"])}</p>
+          <p><b>例句：</b>${escapeHtml(item["例句/常见搭配"])}</p>
+          <p><b>辨析：</b>${escapeHtml(item["近义辨析"])}</p>
+          <div class="tag-row">
+            <span class="tag">${escapeHtml(item["感情色彩"])}</span>
+            <span class="tag ${current === "已掌握" ? "good" : "warn"}">${escapeHtml(current)}</span>
+          </div>
+          <div class="idiom-actions">
+            <button class="small-btn" data-idiom="${escapeHtml(item["成语"])}" data-status="已掌握">已掌握</button>
+            <button class="small-btn" data-idiom="${escapeHtml(item["成语"])}" data-status="需复习">需复习</button>
+            <button class="small-btn" data-idiom="${escapeHtml(item["成语"])}" data-status="未掌握">未掌握</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderResources() {
+  $("#shenlunSites").innerHTML = state.base.shenlunSites.map(resourceCard).join("");
+  $("#xingceSites").innerHTML = state.base.xingceSites.map(resourceCard).join("");
+}
+
+function resourceCard(item) {
+  const name = item["网站/渠道"] || "";
+  const link = item["链接"] || "";
+  const suitable = item["适合看什么"] || item["适合练什么"] || "";
+  return `
+    <article class="resource-card">
+      <strong>${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noreferrer">${escapeHtml(name)}</a>` : escapeHtml(name)}</strong>
+      <p>${escapeHtml(suitable)}</p>
+      <p>${escapeHtml(item["怎么用"])}</p>
+      <div class="tag-row">
+        <span class="tag">${escapeHtml(item["建议频率"] || item["重点模块"] || "")}</span>
+      </div>
+    </article>
+  `;
+}
+
+function serializeForm(form) {
+  return Object.fromEntries(new FormData(form).entries());
+}
+
+function setDefaultDates() {
+  document.querySelectorAll('input[type="date"]').forEach((input) => {
+    if (!input.value) input.value = today();
+  });
+}
+
+function downloadJson() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    local: state.local,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `公考复习小程序数据-${today()}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function bindEvents() {
+  document.querySelectorAll(".nav-btn").forEach((button) => {
+    button.addEventListener("click", () => switchView(button.dataset.view));
+  });
+
+  $("#dailyForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = serializeForm(event.currentTarget);
+    const total = Number(form.total || 0);
+    const correct = Number(form.correct || 0);
+    state.local.daily.unshift({
+      date: form.date,
+      minutes: form.minutes,
+      module: form.module,
+      total,
+      correct,
+      rate: total > 0 ? `${Math.round((correct / total) * 1000) / 10}%` : "",
+      shenlunTask: form.shenlunTask,
+      problem: form.problem,
+      adjust: form.adjust,
+    });
+    saveLocal();
+    renderDaily();
+    renderDashboard();
+    event.currentTarget.reset();
+    setDefaultDates();
+  });
+
+  $("#mistakeForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = serializeForm(event.currentTarget);
+    state.local.mistakes.unshift(form);
+    saveLocal();
+    renderMistakes();
+    renderDashboard();
+    event.currentTarget.reset();
+    setDefaultDates();
+  });
+
+  $("#shenlunForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = serializeForm(event.currentTarget);
+    state.local.shenlun.unshift(form);
+    saveLocal();
+    renderShenlun();
+    renderDashboard();
+    event.currentTarget.reset();
+    setDefaultDates();
+  });
+
+  ["dailySearch", "mistakeSearch", "shenlunSearch"].forEach((id) => {
+    $(`#${id}`).addEventListener("input", () => {
+      if (id === "dailySearch") renderDaily();
+      if (id === "mistakeSearch") renderMistakes();
+      if (id === "shenlunSearch") renderShenlun();
+    });
+  });
+
+  ["idiomSearch", "idiomTone", "idiomStatus"].forEach((id) => {
+    $(`#${id}`).addEventListener("input", renderIdioms);
+  });
+
+  $("#idiomCards").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-idiom]");
+    if (!button) return;
+    state.local.idiomStatus[button.dataset.idiom] = button.dataset.status;
+    saveLocal();
+    renderIdioms();
+  });
+
+  $("#exportJsonBtn").addEventListener("click", downloadJson);
+  $("#resetBtn").addEventListener("click", () => {
+    if (!confirm("确定清空当前浏览器里的新增记录和成语状态吗？")) return;
+    localStorage.removeItem(STORAGE_KEY);
+    state.local = { daily: [], mistakes: [], shenlun: [], idiomStatus: {} };
+    renderAll();
+  });
+}
+
+function renderAll() {
+  renderDashboard();
+  renderDaily();
+  renderMistakes();
+  renderShenlun();
+  renderIdioms();
+  renderResources();
+}
+
+async function init() {
+  loadLocal();
+  if (window.STUDY_DATA) {
+    state.base = window.STUDY_DATA;
+  } else {
+    const response = await fetch("data.json");
+    state.base = await response.json();
+  }
+  bindEvents();
+  setDefaultDates();
+  renderAll();
+}
+
+init().catch((error) => {
+  document.body.innerHTML = `<main class="app"><section class="panel"><h2>加载失败</h2><p>${escapeHtml(error.message)}</p></section></main>`;
+});
