@@ -1,3 +1,7 @@
 *.pyc
 __pycache__/
 .DS_Store
+server.py
+server.out.log
+server.err.log
+study_records.db

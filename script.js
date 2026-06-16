@@ -1,4 +1,7 @@
-const STORAGE_KEY = "civil-service-study-state-v1";
+const LEGACY_STORAGE_KEY = "civil-service-study-state-v1";
+const STORAGE_PREFIX = "civil-service-study-state-by-user-v1";
+const USER_KEY = "civil-service-study-user-v1";
+const DEFAULT_USER_ID = "默认用户";
 
 const state = {
   base: null,
@@ -36,18 +39,46 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function emptyLocal() {
+  return {
+    daily: [],
+    mistakes: [],
+    shenlun: [],
+    idiomStatus: {},
+  };
+}
+
+function currentUserId() {
+  return ($("#userIdInput")?.value || DEFAULT_USER_ID).trim() || DEFAULT_USER_ID;
+}
+
+function storageKey(userId = currentUserId()) {
+  return `${STORAGE_PREFIX}:${userId}`;
+}
+
 function loadLocal() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return;
+  const key = storageKey();
+  const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+  if (!localStorage.getItem(key) && legacyRaw && key !== LEGACY_STORAGE_KEY) {
+    localStorage.setItem(key, legacyRaw);
+  }
+
+  const raw = localStorage.getItem(key);
+  state.local = emptyLocal();
+  if (!raw) {
+    saveLocal();
+    return;
+  }
   try {
     state.local = { ...state.local, ...JSON.parse(raw) };
   } catch {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey());
   }
 }
 
 function saveLocal() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.local));
+  localStorage.setItem(storageKey(), JSON.stringify(state.local));
+  localStorage.setItem(USER_KEY, currentUserId());
 }
 
 function normalizeDaily(row) {
@@ -309,13 +340,14 @@ function setDefaultDates() {
 function downloadJson() {
   const payload = {
     exportedAt: new Date().toISOString(),
+    userId: currentUserId(),
     local: state.local,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `公考复习小程序数据-${today()}.json`;
+  link.download = `公考复习-${currentUserId()}-${today()}.json`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -390,11 +422,17 @@ function bindEvents() {
     renderIdioms();
   });
 
+  $("#userIdInput").addEventListener("change", () => {
+    loadLocal();
+    renderAll();
+    saveLocal();
+  });
+
   $("#exportJsonBtn").addEventListener("click", downloadJson);
   $("#resetBtn").addEventListener("click", () => {
     if (!confirm("确定清空当前浏览器里的新增记录和成语状态吗？")) return;
-    localStorage.removeItem(STORAGE_KEY);
-    state.local = { daily: [], mistakes: [], shenlun: [], idiomStatus: {} };
+    localStorage.removeItem(storageKey());
+    state.local = emptyLocal();
     renderAll();
   });
 }
@@ -409,6 +447,7 @@ function renderAll() {
 }
 
 async function init() {
+  $("#userIdInput").value = localStorage.getItem(USER_KEY) || DEFAULT_USER_ID;
   loadLocal();
   if (window.STUDY_DATA) {
     state.base = window.STUDY_DATA;

@@ -149,6 +149,15 @@ h3 {
   align-items: center;
 }
 
+.user-field {
+  width: 150px;
+  color: var(--muted);
+}
+
+.user-field input {
+  margin-top: 3px;
+}
+
 .view {
   display: none;
 }
