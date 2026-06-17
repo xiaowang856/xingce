@@ -142,6 +142,11 @@ function getSupabaseClient() {
   return state.supabase;
 }
 
+function canUseCloudSync() {
+  const config = window.SUPABASE_CONFIG;
+  return Boolean(config?.url && config?.anonKey && window.supabase?.createClient && currentSyncPassword());
+}
+
 function requireSyncPassword() {
   const password = currentSyncPassword();
   if (!password) throw new Error("请输入同步密码");
@@ -519,7 +524,7 @@ async function loadCloudState() {
   showToast("已读取云端数据");
 }
 
-async function saveCloudState() {
+async function saveCloudState(options = {}) {
   const userId = currentUserId();
   const password = requireSyncPassword();
   const syncId = await syncIdFor(userId, password);
@@ -538,7 +543,17 @@ async function saveCloudState() {
   );
   if (error) throw new Error(error.message);
   saveLocal();
-  showToast("已保存到云端");
+  if (!options.silent) showToast("已保存到云端");
+}
+
+async function autoSaveCloudState(reason) {
+  if (!canUseCloudSync()) return;
+  try {
+    await saveCloudState({ silent: true });
+    if (reason) showToast(`${reason}，已同步云端`);
+  } catch (error) {
+    showToast(`${reason || "本地已保存"}，但云端同步失败：${error.message}`, "error");
+  }
 }
 
 function matchRemoteIdiom(row, word) {
@@ -676,6 +691,7 @@ function importAvatarFile(file) {
     $("#avatarInput").value = "";
     URL.revokeObjectURL(url);
     showToast("头像已上传");
+    autoSaveCloudState("头像已上传");
   });
   image.addEventListener("error", () => {
     showToast("头像读取失败", "error");
@@ -686,10 +702,22 @@ function importAvatarFile(file) {
 }
 
 async function runCloudAction(action) {
+  const button = action === loadCloudState ? $("#loadCloudBtn") : $("#saveCloudBtn");
+  const originalText = button?.textContent || "";
   try {
+    if (button) {
+      button.disabled = true;
+      button.textContent = action === loadCloudState ? "读取中..." : "保存中...";
+    }
+    showToast(action === loadCloudState ? "正在读取云端..." : "正在保存云端...");
     await action();
   } catch (error) {
     showToast(error.message, "error");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
   }
 }
 
@@ -810,6 +838,7 @@ function bindEvents() {
     saveLocal();
     renderProfile();
     showToast("头像已移除");
+    autoSaveCloudState("头像已移除");
   });
 
   $("#exportJsonBtn").addEventListener("click", downloadJson);

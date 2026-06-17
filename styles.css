@@ -385,6 +385,12 @@ textarea {
   background: #f7fafc;
 }
 
+.primary-btn:disabled,
+.ghost-btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .compact-btn {
   padding: 0 18px;
 }
