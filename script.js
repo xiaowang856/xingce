@@ -11,6 +11,7 @@ const state = {
   idiomOrder: [],
   remoteIdioms: null,
   supabase: null,
+  editingMistakeId: "",
   local: {
     daily: [],
     mistakes: [],
@@ -76,6 +77,19 @@ function emptyLocal() {
       avatar: "",
     },
   };
+}
+
+function createRecordId(prefix = "r") {
+  if (crypto?.randomUUID) return `${prefix}-${crypto.randomUUID()}`;
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function ensureMistakeIds(list) {
+  return (Array.isArray(list) ? list : []).map((item) => (item?.id ? item : { ...item, id: createRecordId("m") }));
+}
+
+function hasMistakeWithoutId(list) {
+  return Array.isArray(list) && list.some((item) => item && !item.id);
 }
 
 function currentUserId() {
@@ -180,12 +194,16 @@ function loadLocal() {
 
   const raw = localStorage.getItem(key);
   state.local = emptyLocal();
+  state.editingMistakeId = "";
   if (!raw) {
     saveLocal();
     return;
   }
   try {
     state.local = { ...state.local, ...JSON.parse(raw) };
+    const shouldPersistMistakeIds = hasMistakeWithoutId(state.local.mistakes);
+    state.local.mistakes = ensureMistakeIds(state.local.mistakes);
+    if (shouldPersistMistakeIds) saveLocal();
   } catch {
     localStorage.removeItem(storageKey());
   }
@@ -202,7 +220,9 @@ function normalizeImportedLocal(value) {
     throw new Error("文件内容不是有效的数据对象");
   }
   const imported = value.local && typeof value.local === "object" ? value.local : value;
-  return { ...emptyLocal(), ...imported };
+  const normalized = { ...emptyLocal(), ...imported };
+  normalized.mistakes = ensureMistakeIds(normalized.mistakes);
+  return normalized;
 }
 
 function normalizeDaily(row) {
@@ -224,6 +244,7 @@ function normalizeDaily(row) {
 
 function normalizeMistake(row) {
   return {
+    id: row.id || "",
     date: row["日期"] || row.date || "",
     module: row["模块"] || row.module || "",
     type: row["题型"] || row.type || "",
@@ -286,7 +307,6 @@ function renderProfile() {
 }
 
 function cachedIdiomEntries() {
-  const baseNames = new Set(state.base.idioms.map((item) => item["成语"]));
   return Object.entries(state.local.idiomLookupCache || {})
     .map(([word, data]) => ({
       "成语": data.word || word,
@@ -300,7 +320,7 @@ function cachedIdiomEntries() {
       "掌握状态": "未掌握",
       cachedAt: data.cachedAt || "",
     }))
-    .filter((item) => item["成语"] && !baseNames.has(item["成语"]))
+    .filter((item) => item["成语"])
     .sort((a, b) => String(b.cachedAt).localeCompare(String(a.cachedAt)));
 }
 
@@ -371,6 +391,55 @@ function table(headers, rows) {
   `;
 }
 
+function renderMistakeTable(rows) {
+  if (!rows.length) {
+    return `<div class="focus-item"><p>暂无记录。</p></div>`;
+  }
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>模块</th>
+          <th>题型</th>
+          <th>错因</th>
+          <th>正确方法</th>
+          <th>题源</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            (row) => `
+              <tr>
+                <td>${escapeHtml(row.date)}</td>
+                <td>${escapeHtml(row.module)}</td>
+                <td>${escapeHtml(row.type)}</td>
+                <td>${escapeHtml(row.reason)}</td>
+                <td>${escapeHtml(row.method)}</td>
+                <td>${escapeHtml(row.source)}</td>
+                <td>
+                  ${
+                    row.id
+                      ? `
+                    <div class="table-actions">
+                      <button class="small-btn" data-mistake-action="edit" data-mistake-id="${escapeHtml(row.id)}" type="button">编辑</button>
+                      <button class="small-btn danger-btn" data-mistake-action="delete" data-mistake-id="${escapeHtml(row.id)}" type="button">删除</button>
+                    </div>
+                  `
+                      : `<span class="muted">内置</span>`
+                  }
+                </td>
+              </tr>
+            `,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
+}
+
 function includesRow(row, keyword) {
   if (!keyword) return true;
   return Object.values(row).join(" ").toLowerCase().includes(keyword.toLowerCase());
@@ -398,17 +467,7 @@ function renderDaily() {
 function renderMistakes() {
   const keyword = $("#mistakeSearch").value.trim();
   const rows = allMistakes().filter((row) => includesRow(row, keyword));
-  $("#mistakeTable").innerHTML = table(
-    [
-      { key: "date", label: "日期" },
-      { key: "module", label: "模块" },
-      { key: "type", label: "题型" },
-      { key: "reason", label: "错因" },
-      { key: "method", label: "正确方法" },
-      { key: "source", label: "题源" },
-    ],
-    rows,
-  );
+  $("#mistakeTable").innerHTML = renderMistakeTable(rows);
 }
 
 function renderShenlun() {
@@ -779,12 +838,23 @@ function bindEvents() {
   $("#mistakeForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const form = serializeForm(event.currentTarget);
-    state.local.mistakes.unshift(form);
+    if (state.editingMistakeId) {
+      const index = state.local.mistakes.findIndex((item) => item.id === state.editingMistakeId);
+      if (index >= 0) {
+        state.local.mistakes[index] = { ...state.local.mistakes[index], ...form, id: state.editingMistakeId };
+        showToast("错题已更新");
+      } else {
+        state.local.mistakes.unshift({ ...form, id: createRecordId("m") });
+        showToast("错题已保存");
+      }
+    } else {
+      state.local.mistakes.unshift({ ...form, id: createRecordId("m") });
+      showToast("错题已保存");
+    }
     saveLocal();
     renderMistakes();
     renderDashboard();
-    event.currentTarget.reset();
-    setDefaultDates();
+    resetMistakeEditState();
   });
 
   $("#shenlunForm").addEventListener("submit", (event) => {
@@ -805,6 +875,30 @@ function bindEvents() {
       if (id === "shenlunSearch") renderShenlun();
     });
   });
+
+  $("#mistakeTable").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-mistake-action]");
+    if (!button) return;
+    const { mistakeAction, mistakeId } = button.dataset;
+    const row = state.local.mistakes.find((item) => item.id === mistakeId);
+    if (!row) return;
+    if (mistakeAction === "edit") {
+      fillMistakeForm(row);
+      showToast("已载入到编辑区");
+      return;
+    }
+    if (mistakeAction === "delete") {
+      if (!confirm("确定删除这条错题吗？")) return;
+      state.local.mistakes = state.local.mistakes.filter((item) => item.id !== mistakeId);
+      if (state.editingMistakeId === mistakeId) resetMistakeEditState();
+      saveLocal();
+      renderMistakes();
+      renderDashboard();
+      showToast("错题已删除");
+    }
+  });
+
+  $("#cancelMistakeEditBtn").addEventListener("click", resetMistakeEditState);
 
   ["idiomSearch", "idiomTone", "idiomStatus"].forEach((id) => {
     $(`#${id}`).addEventListener("input", renderIdioms);
@@ -893,6 +987,36 @@ function renderAll() {
   renderIdioms();
   renderResources();
   renderProfile();
+  syncMistakeEditState();
+}
+
+function syncMistakeEditState() {
+  const submitBtn = $("#mistakeSubmitBtn");
+  const cancelBtn = $("#cancelMistakeEditBtn");
+  const editing = Boolean(state.editingMistakeId);
+  if (submitBtn) submitBtn.textContent = editing ? "保存修改" : "保存错题";
+  if (cancelBtn) cancelBtn.hidden = !editing;
+}
+
+function resetMistakeEditState() {
+  state.editingMistakeId = "";
+  const form = $("#mistakeForm");
+  if (form) form.reset();
+  setDefaultDates();
+  syncMistakeEditState();
+}
+
+function fillMistakeForm(row) {
+  const form = $("#mistakeForm");
+  if (!form || !row) return;
+  form.elements.date.value = row.date || "";
+  form.elements.module.value = row.module || "";
+  form.elements.type.value = row.type || "";
+  form.elements.reason.value = row.reason || "";
+  form.elements.method.value = row.method || "";
+  form.elements.source.value = row.source || "";
+  state.editingMistakeId = row.id || "";
+  syncMistakeEditState();
 }
 
 async function init() {

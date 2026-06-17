@@ -538,6 +538,27 @@ th {
   color: var(--brand-dark);
 }
 
+.danger-btn {
+  border-color: #f1c1c1;
+  color: var(--red);
+}
+
+.danger-btn:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.table-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 a {
   color: var(--brand);
 }
