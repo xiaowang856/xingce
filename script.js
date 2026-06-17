@@ -18,6 +18,9 @@ const state = {
     idiomStatus: {},
     idiomNotes: {},
     idiomLookupCache: {},
+    profile: {
+      avatar: "",
+    },
   },
 };
 
@@ -28,6 +31,7 @@ const titles = {
   shenlun: "申论练习",
   idioms: "成语积累",
   resources: "网站资源",
+  profile: "个人设置",
 };
 
 function $(selector) {
@@ -55,6 +59,9 @@ function emptyLocal() {
     idiomStatus: {},
     idiomNotes: {},
     idiomLookupCache: {},
+    profile: {
+      avatar: "",
+    },
   };
 }
 
@@ -244,6 +251,17 @@ function switchView(viewName) {
   $(`#${viewName}`).classList.add("active");
   document.querySelector(`[data-view="${viewName}"]`).classList.add("active");
   $("#viewTitle").textContent = titles[viewName];
+}
+
+function renderProfile() {
+  const avatar = state.local.profile?.avatar || "";
+  const preview = $("#avatarPreview");
+  if (!preview) return;
+  if (avatar) {
+    preview.innerHTML = `<img src="${escapeHtml(avatar)}" alt="头像" />`;
+  } else {
+    preview.textContent = (currentUserId()[0] || "考").toUpperCase();
+  }
 }
 
 function renderDashboard() {
@@ -616,6 +634,37 @@ function importJsonFile(file) {
   reader.readAsText(file, "utf-8");
 }
 
+function importAvatarFile(file) {
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    alert("请选择图片文件");
+    return;
+  }
+  const image = new Image();
+  const url = URL.createObjectURL(file);
+  image.addEventListener("load", () => {
+    const canvas = document.createElement("canvas");
+    const size = 240;
+    const side = Math.min(image.naturalWidth, image.naturalHeight);
+    const offsetX = (image.naturalWidth - side) / 2;
+    const offsetY = (image.naturalHeight - side) / 2;
+    canvas.width = size;
+    canvas.height = size;
+    canvas.getContext("2d").drawImage(image, offsetX, offsetY, side, side, 0, 0, size, size);
+    state.local.profile = { ...(state.local.profile || {}), avatar: canvas.toDataURL("image/jpeg", 0.86) };
+    saveLocal();
+    renderProfile();
+    $("#avatarInput").value = "";
+    URL.revokeObjectURL(url);
+  });
+  image.addEventListener("error", () => {
+    alert("头像读取失败");
+    $("#avatarInput").value = "";
+    URL.revokeObjectURL(url);
+  });
+  image.src = url;
+}
+
 async function runCloudAction(action) {
   try {
     await action();
@@ -727,6 +776,16 @@ function bindEvents() {
     saveLocal();
   });
 
+  $("#avatarUploadBtn").addEventListener("click", () => $("#avatarInput").click());
+  $("#avatarInput").addEventListener("change", (event) => {
+    importAvatarFile(event.currentTarget.files?.[0]);
+  });
+  $("#avatarRemoveBtn").addEventListener("click", () => {
+    state.local.profile = { ...(state.local.profile || {}), avatar: "" };
+    saveLocal();
+    renderProfile();
+  });
+
   $("#exportJsonBtn").addEventListener("click", downloadJson);
   $("#importJsonBtn").addEventListener("click", () => $("#importJsonInput").click());
   $("#importJsonInput").addEventListener("change", (event) => {
@@ -749,6 +808,7 @@ function renderAll() {
   renderShenlun();
   renderIdioms();
   renderResources();
+  renderProfile();
 }
 
 async function init() {

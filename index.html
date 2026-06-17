@@ -22,6 +22,7 @@
         <button class="nav-btn" data-view="shenlun">申论练习</button>
         <button class="nav-btn" data-view="idioms">成语积累</button>
         <button class="nav-btn" data-view="resources">网站资源</button>
+        <button class="nav-btn" data-view="profile">个人设置</button>
       </nav>
       <div class="sidebar-note">
         <strong>本地保存</strong>
@@ -34,16 +35,6 @@
         <div>
           <p class="eyebrow">Civil Service Study</p>
           <h2 id="viewTitle">总览</h2>
-        </div>
-        <div class="top-actions">
-          <label class="user-field">使用者<input id="userIdInput" type="text" autocomplete="username" /></label>
-          <label class="user-field">同步密码<input id="syncPasswordInput" type="password" autocomplete="current-password" /></label>
-          <button id="loadCloudBtn" class="ghost-btn">读取云端</button>
-          <button id="saveCloudBtn" class="ghost-btn">保存云端</button>
-          <button id="exportJsonBtn" class="ghost-btn">导出我的数据</button>
-          <button id="importJsonBtn" class="ghost-btn">导入数据</button>
-          <input id="importJsonInput" class="file-input" type="file" accept="application/json,.json" />
-          <button id="resetBtn" class="ghost-btn danger">清空本地记录</button>
         </div>
       </header>
 
@@ -231,6 +222,34 @@
             <div id="xingceSites" class="resource-list"></div>
           </section>
         </div>
+      </section>
+
+      <section id="profile" class="view">
+        <section class="panel">
+          <div class="panel-head">
+            <h3>个人设置</h3>
+          </div>
+          <div class="profile-layout">
+            <div class="avatar-editor">
+              <div id="avatarPreview" class="avatar-preview">考</div>
+              <div class="avatar-actions">
+                <button id="avatarUploadBtn" class="ghost-btn" type="button">上传头像</button>
+                <button id="avatarRemoveBtn" class="ghost-btn danger" type="button">移除头像</button>
+                <input id="avatarInput" class="file-input" type="file" accept="image/*" />
+              </div>
+            </div>
+            <form class="settings-grid">
+              <label>使用者<input id="userIdInput" type="text" autocomplete="username" /></label>
+              <label>同步密码<input id="syncPasswordInput" type="password" autocomplete="current-password" /></label>
+              <button id="loadCloudBtn" class="ghost-btn" type="button">读取云端</button>
+              <button id="saveCloudBtn" class="ghost-btn" type="button">保存云端</button>
+              <button id="exportJsonBtn" class="ghost-btn" type="button">导出我的数据</button>
+              <button id="importJsonBtn" class="ghost-btn" type="button">导入数据</button>
+              <input id="importJsonInput" class="file-input" type="file" accept="application/json,.json" />
+              <button id="resetBtn" class="ghost-btn danger" type="button">清空本地记录</button>
+            </form>
+          </div>
+        </section>
       </section>
     </main>
 
