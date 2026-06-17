@@ -33,3 +33,6 @@ with check (true);
 
 create index if not exists study_profiles_user_name_idx
 on public.study_profiles (user_name);
+
+create unique index if not exists study_profiles_user_name_unique_idx
+on public.study_profiles (user_name);

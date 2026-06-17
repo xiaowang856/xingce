@@ -172,6 +172,17 @@ async function syncIdFor(userId, password) {
   return sha256Text(`${userId}:${password}`);
 }
 
+async function findCloudProfileByUserName(supabase, userId) {
+  const { data, error } = await supabase
+    .from(CLOUD_TABLE)
+    .select("sync_id, payload, salt, updated_at")
+    .eq("user_name", userId)
+    .limit(2);
+  if (error) throw new Error(error.message);
+  if (data.length > 1) throw new Error("数据库里已有重复用户名，请先在 Supabase 清理重复记录");
+  return data[0] || null;
+}
+
 function shuffle(values) {
   const result = [...values];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -594,10 +605,8 @@ async function loadRemoteIdioms() {
 async function loadCloudState() {
   const userId = currentUserId();
   const password = requireSyncPassword();
-  const syncId = await syncIdFor(userId, password);
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase.from(CLOUD_TABLE).select("payload, salt, updated_at").eq("sync_id", syncId).maybeSingle();
-  if (error) throw new Error(error.message);
+  const data = await findCloudProfileByUserName(supabase, userId);
   if (!data?.payload) throw new Error("云端没有找到该使用者的数据");
   const local = await decryptLocalData(data.payload, password, data.salt);
   state.local = { ...emptyLocal(), ...local };
@@ -613,16 +622,29 @@ async function saveCloudState(options = {}) {
   const salt = `civil-service-study:${userId}`;
   const payload = await encryptLocalData(state.local, password, salt);
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from(CLOUD_TABLE).upsert(
-    {
-      sync_id: syncId,
-      user_name: userId,
-      salt,
-      payload,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "sync_id" },
-  );
+  const existing = await findCloudProfileByUserName(supabase, userId);
+
+  if (existing?.payload) {
+    try {
+      await decryptLocalData(existing.payload, password, existing.salt);
+    } catch {
+      throw new Error("用户名已存在，密码不正确，不能覆盖云端数据");
+    }
+  }
+
+  const record = {
+    sync_id: syncId,
+    user_name: userId,
+    salt,
+    payload,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = existing
+    ? await supabase
+        .from(CLOUD_TABLE)
+        .update(record)
+        .eq("user_name", userId)
+    : await supabase.from(CLOUD_TABLE).insert(record);
   if (error) throw new Error(error.message);
   saveLocal();
   if (!options.silent) showToast("已保存到云端");
