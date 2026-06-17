@@ -37,6 +37,9 @@
         </div>
         <div class="top-actions">
           <label class="user-field">使用者<input id="userIdInput" type="text" autocomplete="username" /></label>
+          <label class="user-field">同步密码<input id="syncPasswordInput" type="password" autocomplete="current-password" /></label>
+          <button id="loadCloudBtn" class="ghost-btn">读取云端</button>
+          <button id="saveCloudBtn" class="ghost-btn">保存云端</button>
           <button id="exportJsonBtn" class="ghost-btn">导出我的数据</button>
           <button id="importJsonBtn" class="ghost-btn">导入数据</button>
           <input id="importJsonInput" class="file-input" type="file" accept="application/json,.json" />
@@ -232,6 +235,8 @@
     </main>
 
     <script src="data.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

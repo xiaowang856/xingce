@@ -1,13 +1,16 @@
 const LEGACY_STORAGE_KEY = "civil-service-study-state-v1";
 const STORAGE_PREFIX = "civil-service-study-state-by-user-v1";
 const USER_KEY = "civil-service-study-user-v1";
+const SYNC_PASSWORD_KEY = "civil-service-study-sync-password-v1";
 const IDIOM_API_URL = "https://raw.githubusercontent.com/pwxcoo/chinese-xinhua/master/data/idiom.json";
 const DEFAULT_USER_ID = "默认用户";
+const CLOUD_TABLE = "study_profiles";
 
 const state = {
   base: null,
   idiomOrder: [],
   remoteIdioms: null,
+  supabase: null,
   local: {
     daily: [],
     mistakes: [],
@@ -59,8 +62,75 @@ function currentUserId() {
   return ($("#userIdInput")?.value || DEFAULT_USER_ID).trim() || DEFAULT_USER_ID;
 }
 
+function currentSyncPassword() {
+  return $("#syncPasswordInput")?.value || "";
+}
+
 function storageKey(userId = currentUserId()) {
   return `${STORAGE_PREFIX}:${userId}`;
+}
+
+function bytesToBase64(bytes) {
+  return btoa(String.fromCharCode(...new Uint8Array(bytes)));
+}
+
+function base64ToBytes(value) {
+  return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+}
+
+async function sha256Text(value) {
+  const bytes = new TextEncoder().encode(value);
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function deriveCryptoKey(password, salt) {
+  const baseKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: new TextEncoder().encode(salt), iterations: 100000, hash: "SHA-256" },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+async function encryptLocalData(local, password, salt) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveCryptoKey(password, salt);
+  const encoded = new TextEncoder().encode(JSON.stringify(local));
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
+  return {
+    iv: bytesToBase64(iv),
+    data: bytesToBase64(encrypted),
+  };
+}
+
+async function decryptLocalData(payload, password, salt) {
+  const key = await deriveCryptoKey(password, salt);
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(payload.iv) }, key, base64ToBytes(payload.data));
+  return JSON.parse(new TextDecoder().decode(decrypted));
+}
+
+function getSupabaseClient() {
+  if (state.supabase) return state.supabase;
+  const config = window.SUPABASE_CONFIG;
+  if (!config?.url || !config?.anonKey || !window.supabase?.createClient) {
+    throw new Error("请先配置 config.js 里的 Supabase URL 和 anonKey");
+  }
+  state.supabase = window.supabase.createClient(config.url, config.anonKey);
+  return state.supabase;
+}
+
+function requireSyncPassword() {
+  const password = currentSyncPassword();
+  if (!password) throw new Error("请输入同步密码");
+  localStorage.setItem(SYNC_PASSWORD_KEY, password);
+  return password;
+}
+
+async function syncIdFor(userId, password) {
+  return sha256Text(`${userId}:${password}`);
 }
 
 function shuffle(values) {
@@ -99,6 +169,7 @@ function loadLocal() {
 function saveLocal() {
   localStorage.setItem(storageKey(), JSON.stringify(state.local));
   localStorage.setItem(USER_KEY, currentUserId());
+  if (currentSyncPassword()) localStorage.setItem(SYNC_PASSWORD_KEY, currentSyncPassword());
 }
 
 function normalizeImportedLocal(value) {
@@ -399,6 +470,41 @@ async function loadRemoteIdioms() {
   return state.remoteIdioms;
 }
 
+async function loadCloudState() {
+  const userId = currentUserId();
+  const password = requireSyncPassword();
+  const syncId = await syncIdFor(userId, password);
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.from(CLOUD_TABLE).select("payload, salt, updated_at").eq("sync_id", syncId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data?.payload) throw new Error("云端没有找到该使用者的数据");
+  const local = await decryptLocalData(data.payload, password, data.salt);
+  state.local = { ...emptyLocal(), ...local };
+  saveLocal();
+  renderAll();
+}
+
+async function saveCloudState() {
+  const userId = currentUserId();
+  const password = requireSyncPassword();
+  const syncId = await syncIdFor(userId, password);
+  const salt = `civil-service-study:${userId}`;
+  const payload = await encryptLocalData(state.local, password, salt);
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from(CLOUD_TABLE).upsert(
+    {
+      sync_id: syncId,
+      user_name: userId,
+      salt,
+      payload,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "sync_id" },
+  );
+  if (error) throw new Error(error.message);
+  saveLocal();
+}
+
 function matchRemoteIdiom(row, word) {
   return row?.word === word || row?.name === word || row?.derivation === word;
 }
@@ -510,6 +616,14 @@ function importJsonFile(file) {
   reader.readAsText(file, "utf-8");
 }
 
+async function runCloudAction(action) {
+  try {
+    await action();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
 function bindEvents() {
   document.querySelectorAll(".nav-btn").forEach((button) => {
     button.addEventListener("click", () => switchView(button.dataset.view));
@@ -609,11 +723,17 @@ function bindEvents() {
     saveLocal();
   });
 
+  $("#syncPasswordInput").addEventListener("change", () => {
+    saveLocal();
+  });
+
   $("#exportJsonBtn").addEventListener("click", downloadJson);
   $("#importJsonBtn").addEventListener("click", () => $("#importJsonInput").click());
   $("#importJsonInput").addEventListener("change", (event) => {
     importJsonFile(event.currentTarget.files?.[0]);
   });
+  $("#loadCloudBtn").addEventListener("click", () => runCloudAction(loadCloudState));
+  $("#saveCloudBtn").addEventListener("click", () => runCloudAction(saveCloudState));
   $("#resetBtn").addEventListener("click", () => {
     if (!confirm("确定清空当前浏览器里的新增记录和成语状态吗？")) return;
     localStorage.removeItem(storageKey());
@@ -633,6 +753,7 @@ function renderAll() {
 
 async function init() {
   $("#userIdInput").value = localStorage.getItem(USER_KEY) || DEFAULT_USER_ID;
+  $("#syncPasswordInput").value = localStorage.getItem(SYNC_PASSWORD_KEY) || "";
   loadLocal();
   if (window.STUDY_DATA) {
     state.base = window.STUDY_DATA;
