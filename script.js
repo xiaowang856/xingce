@@ -14,6 +14,7 @@ const state = {
     shenlun: [],
     idiomStatus: {},
     idiomNotes: {},
+    idiomLookupCache: {},
   },
 };
 
@@ -50,6 +51,7 @@ function emptyLocal() {
     shenlun: [],
     idiomStatus: {},
     idiomNotes: {},
+    idiomLookupCache: {},
   };
 }
 
@@ -393,6 +395,33 @@ function matchRemoteIdiom(row, word) {
   return row?.word === word || row?.name === word || row?.derivation === word;
 }
 
+function cacheIdiomLookup(word, data) {
+  state.local.idiomLookupCache[word] = {
+    word: data.name || data.word || word,
+    pinyin: data.pinyin || data.py || "",
+    explanation: data.explanation || data.content || data.explain || "",
+    derivation: data.derivation || data.source || "",
+    example: data.example || data.samples || "",
+    abbreviation: data.abbreviation || "",
+    cachedAt: new Date().toISOString(),
+  };
+  saveLocal();
+}
+
+function renderCachedIdiomLookup(word, data) {
+  renderIdiomApiResult(`
+    <article class="idiom-api-card">
+      <strong>${escapeHtml(data.word || word)}</strong>
+      <p><b>拼音：</b>${escapeHtml(data.pinyin || "")}</p>
+      <p><b>解释：</b>${escapeHtml(data.explanation || "")}</p>
+      <p><b>出处：</b>${escapeHtml(data.derivation || "")}</p>
+      <p><b>例句：</b>${escapeHtml(data.example || "")}</p>
+      <p><b>缩写：</b>${escapeHtml(data.abbreviation || "")}</p>
+      <p><b>来源：</b>本地缓存</p>
+    </article>
+  `);
+}
+
 async function queryIdiomApi() {
   const word = $("#idiomLookupInput").value.trim();
   if (!word) {
@@ -403,12 +432,19 @@ async function queryIdiomApi() {
   const localMatch = state.base.idioms.find((item) => item["成语"] === word);
   if (localMatch) renderLocalIdiomResult(localMatch);
 
+  const cached = state.local.idiomLookupCache[word];
+  if (cached) {
+    renderCachedIdiomLookup(word, cached);
+    return;
+  }
+
   renderIdiomApiResult(`<article class="idiom-api-card"><p>正在查询成语接口...</p></article>`);
 
   try {
     const remoteIdioms = await loadRemoteIdioms();
     const data = remoteIdioms.find((row) => matchRemoteIdiom(row, word));
     if (!data) throw new Error("接口中未找到该成语");
+    cacheIdiomLookup(word, data);
     renderIdiomApiResult(`
       <article class="idiom-api-card">
         <strong>${escapeHtml(data.name || data.word || word)}</strong>
@@ -417,6 +453,7 @@ async function queryIdiomApi() {
         <p><b>出处：</b>${escapeHtml(data.derivation || data.source || "")}</p>
         <p><b>例句：</b>${escapeHtml(data.example || data.samples || "")}</p>
         <p><b>缩写：</b>${escapeHtml(data.abbreviation || "")}</p>
+        <p><b>来源：</b>接口查询，已保存到本地</p>
       </article>
     `);
   } catch (error) {
