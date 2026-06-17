@@ -256,11 +256,14 @@ function switchView(viewName) {
 function renderProfile() {
   const avatar = state.local.profile?.avatar || "";
   const preview = $("#avatarPreview");
-  if (!preview) return;
+  const topAvatar = $("#topAvatarBtn");
+  const fallback = (currentUserId()[0] || "考").toUpperCase();
   if (avatar) {
-    preview.innerHTML = `<img src="${escapeHtml(avatar)}" alt="头像" />`;
+    if (preview) preview.innerHTML = `<img src="${escapeHtml(avatar)}" alt="头像" />`;
+    if (topAvatar) topAvatar.innerHTML = `<img src="${escapeHtml(avatar)}" alt="头像" />`;
   } else {
-    preview.textContent = (currentUserId()[0] || "考").toUpperCase();
+    if (preview) preview.textContent = fallback;
+    if (topAvatar) topAvatar.textContent = fallback;
   }
 }
 
@@ -677,6 +680,8 @@ function bindEvents() {
   document.querySelectorAll(".nav-btn").forEach((button) => {
     button.addEventListener("click", () => switchView(button.dataset.view));
   });
+
+  $("#topAvatarBtn").addEventListener("click", () => switchView("profile"));
 
   $("#dailyForm").addEventListener("submit", (event) => {
     event.preventDefault();
