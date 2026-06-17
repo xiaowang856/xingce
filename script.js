@@ -1,12 +1,13 @@
 const LEGACY_STORAGE_KEY = "civil-service-study-state-v1";
 const STORAGE_PREFIX = "civil-service-study-state-by-user-v1";
 const USER_KEY = "civil-service-study-user-v1";
-const IDIOM_API_KEY = "civil-service-study-idiom-api-key-v1";
+const IDIOM_API_URL = "https://raw.githubusercontent.com/pwxcoo/chinese-xinhua/master/data/idiom.json";
 const DEFAULT_USER_ID = "默认用户";
 
 const state = {
   base: null,
   idiomOrder: [],
+  remoteIdioms: null,
   local: {
     daily: [],
     mistakes: [],
@@ -380,15 +381,20 @@ function renderLocalIdiomResult(idiom) {
   `);
 }
 
-function normalizeIdiomApiData(payload) {
-  const data = payload?.result || payload?.data || payload?.newslist?.[0] || payload;
-  if (Array.isArray(data)) return data[0] || {};
-  return data || {};
+async function loadRemoteIdioms() {
+  if (state.remoteIdioms) return state.remoteIdioms;
+  const response = await fetch(IDIOM_API_URL);
+  if (!response.ok) throw new Error("成语接口加载失败");
+  state.remoteIdioms = await response.json();
+  return state.remoteIdioms;
+}
+
+function matchRemoteIdiom(row, word) {
+  return row?.word === word || row?.name === word || row?.derivation === word;
 }
 
 async function queryIdiomApi() {
   const word = $("#idiomLookupInput").value.trim();
-  const key = $("#idiomApiKeyInput").value.trim();
   if (!word) {
     renderIdiomApiResult(`<article class="idiom-api-card"><p>请输入要查询的成语。</p></article>`);
     return;
@@ -397,31 +403,20 @@ async function queryIdiomApi() {
   const localMatch = state.base.idioms.find((item) => item["成语"] === word);
   if (localMatch) renderLocalIdiomResult(localMatch);
 
-  if (!key) {
-    if (!localMatch) {
-      renderIdiomApiResult(`<article class="idiom-api-card"><p>未在本地库找到。填写接口Key后可查询在线成语词典。</p></article>`);
-    }
-    return;
-  }
-
-  localStorage.setItem(IDIOM_API_KEY, key);
-  renderIdiomApiResult(`<article class="idiom-api-card"><p>正在查询在线成语词典...</p></article>`);
+  renderIdiomApiResult(`<article class="idiom-api-card"><p>正在查询成语接口...</p></article>`);
 
   try {
-    const url = `https://apis.tianapi.com/chengyu/index?key=${encodeURIComponent(key)}&word=${encodeURIComponent(word)}`;
-    const response = await fetch(url);
-    const payload = await response.json();
-    if (!response.ok || (payload.code && Number(payload.code) !== 200)) {
-      throw new Error(payload.msg || payload.message || "接口查询失败");
-    }
-    const data = normalizeIdiomApiData(payload);
+    const remoteIdioms = await loadRemoteIdioms();
+    const data = remoteIdioms.find((row) => matchRemoteIdiom(row, word));
+    if (!data) throw new Error("接口中未找到该成语");
     renderIdiomApiResult(`
       <article class="idiom-api-card">
         <strong>${escapeHtml(data.name || data.word || word)}</strong>
         <p><b>拼音：</b>${escapeHtml(data.pinyin || data.py || "")}</p>
-        <p><b>解释：</b>${escapeHtml(data.content || data.explain || data.meaning || data.definition || "")}</p>
-        <p><b>出处：</b>${escapeHtml(data.derivation || data.source || data.from || "")}</p>
-        <p><b>例句：</b>${escapeHtml(data.samples || data.example || data.sentence || "")}</p>
+        <p><b>解释：</b>${escapeHtml(data.explanation || data.content || data.explain || "")}</p>
+        <p><b>出处：</b>${escapeHtml(data.derivation || data.source || "")}</p>
+        <p><b>例句：</b>${escapeHtml(data.example || data.samples || "")}</p>
+        <p><b>缩写：</b>${escapeHtml(data.abbreviation || "")}</p>
       </article>
     `);
   } catch (error) {
@@ -564,7 +559,6 @@ function renderAll() {
 
 async function init() {
   $("#userIdInput").value = localStorage.getItem(USER_KEY) || DEFAULT_USER_ID;
-  $("#idiomApiKeyInput").value = localStorage.getItem(IDIOM_API_KEY) || "";
   loadLocal();
   if (window.STUDY_DATA) {
     state.base = window.STUDY_DATA;
