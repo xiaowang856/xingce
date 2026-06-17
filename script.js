@@ -285,8 +285,32 @@ function renderProfile() {
   }
 }
 
+function cachedIdiomEntries() {
+  const baseNames = new Set(state.base.idioms.map((item) => item["成语"]));
+  return Object.entries(state.local.idiomLookupCache || {})
+    .map(([word, data]) => ({
+      "成语": data.word || word,
+      "常见含义": data.explanation || "",
+      "易错点": data.derivation ? `出处：${data.derivation}` : "",
+      "例句/常见搭配": data.example || "",
+      "近义辨析": [data.pinyin ? `拼音：${data.pinyin}` : "", data.abbreviation ? `缩写：${data.abbreviation}` : ""]
+        .filter(Boolean)
+        .join("；"),
+      "感情色彩": "查询",
+      "掌握状态": "未掌握",
+      cachedAt: data.cachedAt || "",
+    }))
+    .filter((item) => item["成语"] && !baseNames.has(item["成语"]))
+    .sort((a, b) => String(b.cachedAt).localeCompare(String(a.cachedAt)));
+}
+
+function allIdiomEntries() {
+  const orderedBase = state.idiomOrder.map((index) => state.base.idioms[index]).filter(Boolean);
+  return [...cachedIdiomEntries(), ...orderedBase];
+}
+
 function renderDashboard() {
-  $("#idiomCount").textContent = state.base.idioms.length;
+  $("#idiomCount").textContent = allIdiomEntries().length;
   $("#mistakeCount").textContent = allMistakes().length;
   $("#shenlunCount").textContent = allShenlun().length;
   const todayRecord = allDaily().find((row) => row.date === today());
@@ -416,8 +440,7 @@ function renderIdioms() {
   const keyword = $("#idiomSearch").value.trim().toLowerCase();
   const tone = $("#idiomTone").value;
   const status = $("#idiomStatus").value;
-  const orderedIdioms = state.idiomOrder.map((index) => state.base.idioms[index]).filter(Boolean);
-  const rows = orderedIdioms.filter((item) => {
+  const rows = allIdiomEntries().filter((item) => {
     const text = Object.values(item).join(" ").toLowerCase();
     const toneOk = !tone || String(item["感情色彩"] || "").includes(tone);
     const statusOk = !status || idiomStatus(item) === status;
@@ -571,6 +594,8 @@ function cacheIdiomLookup(word, data) {
     cachedAt: new Date().toISOString(),
   };
   saveLocal();
+  renderDashboard();
+  renderIdioms();
 }
 
 function renderCachedIdiomLookup(word, data) {
