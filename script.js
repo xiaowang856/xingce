@@ -5,6 +5,7 @@ const DEFAULT_USER_ID = "默认用户";
 
 const state = {
   base: null,
+  idiomOrder: [],
   local: {
     daily: [],
     mistakes: [],
@@ -54,6 +55,19 @@ function currentUserId() {
 
 function storageKey(userId = currentUserId()) {
   return `${STORAGE_PREFIX}:${userId}`;
+}
+
+function shuffle(values) {
+  const result = [...values];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
+}
+
+function resetIdiomOrder() {
+  state.idiomOrder = shuffle(state.base.idioms.map((_, index) => index));
 }
 
 function loadLocal() {
@@ -274,7 +288,8 @@ function renderIdioms() {
   const keyword = $("#idiomSearch").value.trim().toLowerCase();
   const tone = $("#idiomTone").value;
   const status = $("#idiomStatus").value;
-  const rows = state.base.idioms.filter((item) => {
+  const orderedIdioms = state.idiomOrder.map((index) => state.base.idioms[index]).filter(Boolean);
+  const rows = orderedIdioms.filter((item) => {
     const text = Object.values(item).join(" ").toLowerCase();
     const toneOk = !tone || String(item["感情色彩"] || "").includes(tone);
     const statusOk = !status || idiomStatus(item) === status;
@@ -414,6 +429,11 @@ function bindEvents() {
     $(`#${id}`).addEventListener("input", renderIdioms);
   });
 
+  $("#refreshIdiomsBtn").addEventListener("click", () => {
+    resetIdiomOrder();
+    renderIdioms();
+  });
+
   $("#idiomCards").addEventListener("click", (event) => {
     const button = event.target.closest("[data-idiom]");
     if (!button) return;
@@ -455,6 +475,7 @@ async function init() {
     const response = await fetch("data.json");
     state.base = await response.json();
   }
+  resetIdiomOrder();
   bindEvents();
   setDefaultDates();
   renderAll();
