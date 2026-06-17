@@ -11,6 +11,7 @@ const state = {
     mistakes: [],
     shenlun: [],
     idiomStatus: {},
+    idiomNotes: {},
   },
 };
 
@@ -46,6 +47,7 @@ function emptyLocal() {
     mistakes: [],
     shenlun: [],
     idiomStatus: {},
+    idiomNotes: {},
   };
 }
 
@@ -284,6 +286,10 @@ function idiomStatus(idiom) {
   return state.local.idiomStatus[idiom["成语"]] || idiom["掌握状态"] || "未掌握";
 }
 
+function idiomNote(idiom) {
+  return state.local.idiomNotes[idiom["成语"]] || "";
+}
+
 function renderIdioms() {
   const keyword = $("#idiomSearch").value.trim().toLowerCase();
   const tone = $("#idiomTone").value;
@@ -299,6 +305,7 @@ function renderIdioms() {
   $("#idiomCards").innerHTML = rows
     .map((item) => {
       const current = idiomStatus(item);
+      const note = idiomNote(item);
       return `
         <article class="idiom-card">
           <strong>${escapeHtml(item["成语"])}</strong>
@@ -306,6 +313,10 @@ function renderIdioms() {
           <p><b>易错：</b>${escapeHtml(item["易错点"])}</p>
           <p><b>例句：</b>${escapeHtml(item["例句/常见搭配"])}</p>
           <p><b>辨析：</b>${escapeHtml(item["近义辨析"])}</p>
+          <label class="idiom-note">
+            我的含义
+            <textarea data-idiom-note="${escapeHtml(item["成语"])}" rows="3" placeholder="用自己的话写下理解">${escapeHtml(note)}</textarea>
+          </label>
           <div class="tag-row">
             <span class="tag">${escapeHtml(item["感情色彩"])}</span>
             <span class="tag ${current === "已掌握" ? "good" : "warn"}">${escapeHtml(current)}</span>
@@ -440,6 +451,19 @@ function bindEvents() {
     state.local.idiomStatus[button.dataset.idiom] = button.dataset.status;
     saveLocal();
     renderIdioms();
+  });
+
+  $("#idiomCards").addEventListener("input", (event) => {
+    const field = event.target.closest("[data-idiom-note]");
+    if (!field) return;
+    const idiom = field.dataset.idiomNote;
+    const value = field.value.trim();
+    if (value) {
+      state.local.idiomNotes[idiom] = value;
+    } else {
+      delete state.local.idiomNotes[idiom];
+    }
+    saveLocal();
   });
 
   $("#userIdInput").addEventListener("change", () => {
