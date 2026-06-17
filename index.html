@@ -191,6 +191,9 @@
             <h3>成语查询</h3>
             <div class="filters">
               <input id="idiomSearch" class="search" placeholder="搜索成语/含义/易错点" />
+              <input id="idiomLookupInput" class="search" placeholder="输入成语查接口" />
+              <input id="idiomApiKeyInput" class="search" placeholder="接口Key" />
+              <button id="queryIdiomApiBtn" class="ghost-btn" type="button">查询</button>
               <select id="idiomTone">
                 <option value="">全部色彩</option>
                 <option>褒义</option>
@@ -206,6 +209,7 @@
               <button id="refreshIdiomsBtn" class="ghost-btn" type="button">刷新</button>
             </div>
           </div>
+          <div id="idiomApiResult" class="idiom-api-result"></div>
           <div id="idiomCards" class="idiom-grid"></div>
         </section>
       </section>

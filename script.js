@@ -1,6 +1,7 @@
 const LEGACY_STORAGE_KEY = "civil-service-study-state-v1";
 const STORAGE_PREFIX = "civil-service-study-state-by-user-v1";
 const USER_KEY = "civil-service-study-user-v1";
+const IDIOM_API_KEY = "civil-service-study-idiom-api-key-v1";
 const DEFAULT_USER_ID = "默认用户";
 
 const state = {
@@ -363,6 +364,72 @@ function setDefaultDates() {
   });
 }
 
+function renderIdiomApiResult(html) {
+  $("#idiomApiResult").innerHTML = html;
+}
+
+function renderLocalIdiomResult(idiom) {
+  renderIdiomApiResult(`
+    <article class="idiom-api-card">
+      <strong>${escapeHtml(idiom["成语"])}</strong>
+      <p><b>本地含义：</b>${escapeHtml(idiom["常见含义"])}</p>
+      <p><b>易错点：</b>${escapeHtml(idiom["易错点"])}</p>
+      <p><b>例句：</b>${escapeHtml(idiom["例句/常见搭配"])}</p>
+      <p><b>辨析：</b>${escapeHtml(idiom["近义辨析"])}</p>
+    </article>
+  `);
+}
+
+function normalizeIdiomApiData(payload) {
+  const data = payload?.result || payload?.data || payload?.newslist?.[0] || payload;
+  if (Array.isArray(data)) return data[0] || {};
+  return data || {};
+}
+
+async function queryIdiomApi() {
+  const word = $("#idiomLookupInput").value.trim();
+  const key = $("#idiomApiKeyInput").value.trim();
+  if (!word) {
+    renderIdiomApiResult(`<article class="idiom-api-card"><p>请输入要查询的成语。</p></article>`);
+    return;
+  }
+
+  const localMatch = state.base.idioms.find((item) => item["成语"] === word);
+  if (localMatch) renderLocalIdiomResult(localMatch);
+
+  if (!key) {
+    if (!localMatch) {
+      renderIdiomApiResult(`<article class="idiom-api-card"><p>未在本地库找到。填写接口Key后可查询在线成语词典。</p></article>`);
+    }
+    return;
+  }
+
+  localStorage.setItem(IDIOM_API_KEY, key);
+  renderIdiomApiResult(`<article class="idiom-api-card"><p>正在查询在线成语词典...</p></article>`);
+
+  try {
+    const url = `https://apis.tianapi.com/chengyu/index?key=${encodeURIComponent(key)}&word=${encodeURIComponent(word)}`;
+    const response = await fetch(url);
+    const payload = await response.json();
+    if (!response.ok || (payload.code && Number(payload.code) !== 200)) {
+      throw new Error(payload.msg || payload.message || "接口查询失败");
+    }
+    const data = normalizeIdiomApiData(payload);
+    renderIdiomApiResult(`
+      <article class="idiom-api-card">
+        <strong>${escapeHtml(data.name || data.word || word)}</strong>
+        <p><b>拼音：</b>${escapeHtml(data.pinyin || data.py || "")}</p>
+        <p><b>解释：</b>${escapeHtml(data.content || data.explain || data.meaning || data.definition || "")}</p>
+        <p><b>出处：</b>${escapeHtml(data.derivation || data.source || data.from || "")}</p>
+        <p><b>例句：</b>${escapeHtml(data.samples || data.example || data.sentence || "")}</p>
+      </article>
+    `);
+  } catch (error) {
+    const fallback = localMatch ? `<p>已显示本地结果。</p>` : "";
+    renderIdiomApiResult(`<article class="idiom-api-card"><p>在线查询失败：${escapeHtml(error.message)}</p>${fallback}</article>`);
+  }
+}
+
 function downloadJson() {
   const payload = {
     exportedAt: new Date().toISOString(),
@@ -440,6 +507,11 @@ function bindEvents() {
     $(`#${id}`).addEventListener("input", renderIdioms);
   });
 
+  $("#queryIdiomApiBtn").addEventListener("click", queryIdiomApi);
+  $("#idiomLookupInput").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") queryIdiomApi();
+  });
+
   $("#refreshIdiomsBtn").addEventListener("click", () => {
     resetIdiomOrder();
     renderIdioms();
@@ -492,6 +564,7 @@ function renderAll() {
 
 async function init() {
   $("#userIdInput").value = localStorage.getItem(USER_KEY) || DEFAULT_USER_ID;
+  $("#idiomApiKeyInput").value = localStorage.getItem(IDIOM_API_KEY) || "";
   loadLocal();
   if (window.STUDY_DATA) {
     state.base = window.STUDY_DATA;
