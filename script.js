@@ -47,6 +47,19 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+let toastTimer = null;
+
+function showToast(message, type = "success") {
+  const toast = $("#toast");
+  if (!toast) return;
+  clearTimeout(toastTimer);
+  toast.textContent = message;
+  toast.className = `toast show ${type}`;
+  toastTimer = setTimeout(() => {
+    toast.className = "toast";
+  }, 2600);
+}
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -503,6 +516,7 @@ async function loadCloudState() {
   state.local = { ...emptyLocal(), ...local };
   saveLocal();
   renderAll();
+  showToast("已读取云端数据");
 }
 
 async function saveCloudState() {
@@ -524,6 +538,7 @@ async function saveCloudState() {
   );
   if (error) throw new Error(error.message);
   saveLocal();
+  showToast("已保存到云端");
 }
 
 function matchRemoteIdiom(row, word) {
@@ -610,6 +625,7 @@ function downloadJson() {
   link.download = `公考复习-${currentUserId()}-${today()}.json`;
   link.click();
   URL.revokeObjectURL(url);
+  showToast("已导出我的数据");
 }
 
 function importJsonFile(file) {
@@ -623,15 +639,15 @@ function importJsonFile(file) {
       state.local = normalizeImportedLocal(payload);
       saveLocal();
       renderAll();
-      alert(`已导入 ${importedUserId} 的数据。`);
+      showToast(`已导入 ${importedUserId} 的数据`);
     } catch (error) {
-      alert(`导入失败：${error.message}`);
+      showToast(`导入失败：${error.message}`, "error");
     } finally {
       $("#importJsonInput").value = "";
     }
   });
   reader.addEventListener("error", () => {
-    alert("导入失败：文件读取失败");
+    showToast("导入失败：文件读取失败", "error");
     $("#importJsonInput").value = "";
   });
   reader.readAsText(file, "utf-8");
@@ -640,7 +656,7 @@ function importJsonFile(file) {
 function importAvatarFile(file) {
   if (!file) return;
   if (!file.type.startsWith("image/")) {
-    alert("请选择图片文件");
+    showToast("请选择图片文件", "error");
     return;
   }
   const image = new Image();
@@ -659,9 +675,10 @@ function importAvatarFile(file) {
     renderProfile();
     $("#avatarInput").value = "";
     URL.revokeObjectURL(url);
+    showToast("头像已上传");
   });
   image.addEventListener("error", () => {
-    alert("头像读取失败");
+    showToast("头像读取失败", "error");
     $("#avatarInput").value = "";
     URL.revokeObjectURL(url);
   });
@@ -672,7 +689,7 @@ async function runCloudAction(action) {
   try {
     await action();
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, "error");
   }
 }
 
@@ -781,7 +798,10 @@ function bindEvents() {
     saveLocal();
   });
 
-  $("#avatarUploadBtn").addEventListener("click", () => $("#avatarInput").click());
+  $("#avatarUploadBtn").addEventListener("click", () => {
+    showToast("请选择头像图片");
+    $("#avatarInput").click();
+  });
   $("#avatarInput").addEventListener("change", (event) => {
     importAvatarFile(event.currentTarget.files?.[0]);
   });
@@ -789,10 +809,14 @@ function bindEvents() {
     state.local.profile = { ...(state.local.profile || {}), avatar: "" };
     saveLocal();
     renderProfile();
+    showToast("头像已移除");
   });
 
   $("#exportJsonBtn").addEventListener("click", downloadJson);
-  $("#importJsonBtn").addEventListener("click", () => $("#importJsonInput").click());
+  $("#importJsonBtn").addEventListener("click", () => {
+    showToast("请选择导出的 JSON 文件");
+    $("#importJsonInput").click();
+  });
   $("#importJsonInput").addEventListener("change", (event) => {
     importJsonFile(event.currentTarget.files?.[0]);
   });
@@ -803,6 +827,7 @@ function bindEvents() {
     localStorage.removeItem(storageKey());
     state.local = emptyLocal();
     renderAll();
+    showToast("本地记录已清空");
   });
 }
 
