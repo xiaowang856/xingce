@@ -189,24 +189,26 @@
         <section class="panel">
           <div class="panel-head">
             <h3>成语查询</h3>
-            <div class="filters">
-              <input id="idiomSearch" class="search" placeholder="搜索成语/含义/易错点" />
-              <input id="idiomLookupInput" class="search" placeholder="输入成语查询" />
-              <button id="queryIdiomApiBtn" class="ghost-btn" type="button">查询</button>
-              <select id="idiomTone">
-                <option value="">全部色彩</option>
-                <option>褒义</option>
-                <option>贬义</option>
-                <option>中性</option>
-              </select>
-              <select id="idiomStatus">
-                <option value="">全部状态</option>
-                <option>未掌握</option>
-                <option>需复习</option>
-                <option>已掌握</option>
-              </select>
-              <button id="refreshIdiomsBtn" class="ghost-btn" type="button">刷新</button>
+            <div class="filters idiom-lookup">
+              <input id="idiomLookupInput" class="search lookup-input" placeholder="输入成语查询" />
+              <button id="queryIdiomApiBtn" class="primary-btn compact-btn" type="button">查询</button>
             </div>
+          </div>
+          <div class="filters filter-row">
+            <input id="idiomSearch" class="search" placeholder="筛选成语/含义/易错点" />
+            <select id="idiomTone">
+              <option value="">全部色彩</option>
+              <option>褒义</option>
+              <option>贬义</option>
+              <option>中性</option>
+            </select>
+            <select id="idiomStatus">
+              <option value="">全部状态</option>
+              <option>未掌握</option>
+              <option>需复习</option>
+              <option>已掌握</option>
+            </select>
+            <button id="refreshIdiomsBtn" class="ghost-btn" type="button">刷新</button>
           </div>
           <div id="idiomApiResult" class="idiom-api-result"></div>
           <div id="idiomCards" class="idiom-grid"></div>
