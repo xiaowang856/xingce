@@ -170,6 +170,10 @@ h3 {
   margin-top: 3px;
 }
 
+.file-input {
+  display: none;
+}
+
 .view {
   display: none;
 }

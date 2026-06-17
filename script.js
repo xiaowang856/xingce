@@ -101,6 +101,14 @@ function saveLocal() {
   localStorage.setItem(USER_KEY, currentUserId());
 }
 
+function normalizeImportedLocal(value) {
+  if (!value || typeof value !== "object") {
+    throw new Error("文件内容不是有效的数据对象");
+  }
+  const imported = value.local && typeof value.local === "object" ? value.local : value;
+  return { ...emptyLocal(), ...imported };
+}
+
 function normalizeDaily(row) {
   const total = Number(row["行测题量"] || row.total || 0);
   const correct = Number(row["行测正确数"] || row.correct || 0);
@@ -477,6 +485,31 @@ function downloadJson() {
   URL.revokeObjectURL(url);
 }
 
+function importJsonFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    try {
+      const payload = JSON.parse(String(reader.result || "{}"));
+      const importedUserId = String(payload.userId || currentUserId()).trim() || DEFAULT_USER_ID;
+      $("#userIdInput").value = importedUserId;
+      state.local = normalizeImportedLocal(payload);
+      saveLocal();
+      renderAll();
+      alert(`已导入 ${importedUserId} 的数据。`);
+    } catch (error) {
+      alert(`导入失败：${error.message}`);
+    } finally {
+      $("#importJsonInput").value = "";
+    }
+  });
+  reader.addEventListener("error", () => {
+    alert("导入失败：文件读取失败");
+    $("#importJsonInput").value = "";
+  });
+  reader.readAsText(file, "utf-8");
+}
+
 function bindEvents() {
   document.querySelectorAll(".nav-btn").forEach((button) => {
     button.addEventListener("click", () => switchView(button.dataset.view));
@@ -577,6 +610,10 @@ function bindEvents() {
   });
 
   $("#exportJsonBtn").addEventListener("click", downloadJson);
+  $("#importJsonBtn").addEventListener("click", () => $("#importJsonInput").click());
+  $("#importJsonInput").addEventListener("change", (event) => {
+    importJsonFile(event.currentTarget.files?.[0]);
+  });
   $("#resetBtn").addEventListener("click", () => {
     if (!confirm("确定清空当前浏览器里的新增记录和成语状态吗？")) return;
     localStorage.removeItem(storageKey());
