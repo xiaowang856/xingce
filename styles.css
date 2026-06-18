@@ -5,7 +5,8 @@
   --line-strong: #c7d1dd;
   --panel: #ffffff;
   --panel-soft: #f8fbfd;
-  --bg: #edf2f6;
+  --bg: #eaf1f6;
+  --canvas: #f5f8fb;
   --brand: #1f6f8b;
   --brand-dark: #164d63;
   --green: #2f7d59;
@@ -25,8 +26,9 @@ body {
   min-height: 100vh;
   color: var(--ink);
   background:
-    radial-gradient(circle at top left, rgba(31, 111, 139, 0.12), transparent 32%),
-    linear-gradient(180deg, #f8fbfd 0%, #eef3f7 42%, #e2ebf0 100%);
+    radial-gradient(circle at 18% 0%, rgba(31, 111, 139, 0.16), transparent 30%),
+    radial-gradient(circle at 92% 10%, rgba(242, 193, 78, 0.14), transparent 24%),
+    linear-gradient(180deg, #f8fbfd 0%, #edf3f7 44%, #e3edf3 100%);
   font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
   display: grid;
   grid-template-columns: 240px 1fr;
@@ -39,15 +41,15 @@ body::before {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.42)),
+    linear-gradient(rgba(255, 255, 255, 0.46), rgba(255, 255, 255, 0.46)),
     repeating-linear-gradient(
       90deg,
-      rgba(31, 111, 139, 0.04) 0,
-      rgba(31, 111, 139, 0.04) 1px,
+      rgba(31, 111, 139, 0.035) 0,
+      rgba(31, 111, 139, 0.035) 1px,
       transparent 1px,
-      transparent 96px
+      transparent 104px
     );
-  opacity: 0.55;
+  opacity: 0.62;
   z-index: 0;
 }
 
@@ -135,17 +137,19 @@ select {
 }
 
 .app {
-  padding: 24px clamp(18px, 2.5vw, 36px) 36px;
+  padding: 26px clamp(18px, 2.5vw, 38px) 38px;
   min-width: 0;
   position: relative;
   z-index: 1;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.66) 100%);
-  backdrop-filter: blur(6px);
+    linear-gradient(180deg, rgba(248, 251, 253, 0.9) 0%, rgba(239, 245, 249, 0.76) 100%);
+  backdrop-filter: blur(8px);
 }
 
 .view {
   max-width: 1560px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .topbar {
@@ -154,8 +158,12 @@ select {
   align-items: center;
   gap: 16px;
   margin-bottom: 24px;
-  padding: 6px 0 18px;
-  border-bottom: 1px solid rgba(199, 209, 221, 0.65);
+  padding: 12px 16px 16px;
+  border: 1px solid rgba(217, 224, 234, 0.85);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(250, 253, 255, 0.74) 100%);
+  box-shadow: 0 1px 2px rgba(23, 32, 51, 0.04);
 }
 
 .topbar > div {
@@ -303,7 +311,7 @@ h3 {
 
 .metric-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .panel-grid {
@@ -313,15 +321,16 @@ h3 {
 .metric,
 .panel {
   background: var(--panel);
-  border: 1px solid var(--line);
+  border: 1px solid rgba(199, 209, 221, 0.92);
   border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(23, 32, 51, 0.04), 0 12px 28px rgba(23, 32, 51, 0.03);
+  box-shadow: 0 1px 2px rgba(23, 32, 51, 0.04), 0 14px 30px rgba(23, 32, 51, 0.045);
 }
 
 .metric {
-  padding: 20px 18px 18px;
+  min-height: 118px;
+  padding: 22px 20px 20px;
   background:
-    linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
+    linear-gradient(180deg, #ffffff 0%, #f9fcfe 100%);
 }
 
 .metric-link {
@@ -340,17 +349,19 @@ h3 {
 .metric span {
   color: var(--muted);
   font-size: 13px;
+  font-weight: 700;
 }
 
 .metric strong {
   display: block;
-  margin-top: 8px;
-  font-size: 26px;
+  margin-top: 10px;
+  font-size: 28px;
+  line-height: 1.15;
 }
 
 .panel {
-  padding: 20px;
-  margin-bottom: 16px;
+  padding: 22px;
+  margin-bottom: 18px;
   background:
     linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
 }
@@ -360,8 +371,8 @@ h3 {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
-  padding-bottom: 10px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
   border-bottom: 1px solid rgba(217, 224, 234, 0.8);
 }
 
@@ -382,7 +393,7 @@ textarea {
   width: 100%;
   margin-top: 5px;
   padding: 0 10px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(199, 209, 221, 0.95);
   border-radius: 6px;
   background: #fff;
   color: var(--ink);
@@ -466,8 +477,9 @@ textarea {
 
 .table-wrap {
   overflow: auto;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(199, 209, 221, 0.92);
   border-radius: 8px;
+  background: #fff;
 }
 
 table {
@@ -478,7 +490,7 @@ table {
 
 th,
 td {
-  padding: 10px;
+  padding: 11px 12px;
   border-bottom: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
@@ -486,10 +498,15 @@ td {
 }
 
 th {
-  background: #f5f8fa;
+  background: #f2f7fa;
   color: #3a485a;
   position: sticky;
   top: 0;
+  font-weight: 800;
+}
+
+tbody tr:nth-child(even) {
+  background: #fbfdff;
 }
 
 .focus-list,
@@ -497,7 +514,7 @@ th {
 .resource-list,
 .idiom-grid {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .focus-item,
@@ -506,9 +523,10 @@ th {
 .idiom-card,
 .idiom-api-card {
   padding: 12px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(217, 224, 234, 0.9);
   border-radius: 8px;
-  background: var(--panel-soft);
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f9fcfe 100%);
 }
 
 .focus-item strong,
@@ -663,6 +681,10 @@ a {
     min-height: auto;
   }
 
+  .app {
+    padding-top: 18px;
+  }
+
   .nav {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -682,13 +704,21 @@ a {
 
 @media (max-width: 560px) {
   .app {
-    padding: 14px;
+    padding: 14px 12px 22px;
   }
 
   .topbar,
   .panel-head {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .topbar {
+    padding: 14px;
+  }
+
+  .metric {
+    min-height: auto;
   }
 
   .top-avatar {
