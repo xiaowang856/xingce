@@ -135,7 +135,7 @@ select {
 }
 
 .app {
-  padding: 24px clamp(16px, 2.2vw, 32px);
+  padding: 24px clamp(18px, 2.5vw, 36px) 36px;
   min-width: 0;
   position: relative;
   z-index: 1;
@@ -144,14 +144,23 @@ select {
   backdrop-filter: blur(6px);
 }
 
+.view {
+  max-width: 1560px;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid rgba(199, 209, 221, 0.7);
+  margin-bottom: 24px;
+  padding: 6px 0 18px;
+  border-bottom: 1px solid rgba(199, 209, 221, 0.65);
+}
+
+.topbar > div {
+  display: grid;
+  gap: 4px;
 }
 
 .top-avatar {
@@ -294,7 +303,7 @@ h3 {
 
 .metric-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
 .panel-grid {
@@ -306,11 +315,13 @@ h3 {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(23, 32, 51, 0.04);
+  box-shadow: 0 1px 2px rgba(23, 32, 51, 0.04), 0 12px 28px rgba(23, 32, 51, 0.03);
 }
 
 .metric {
-  padding: 18px;
+  padding: 20px 18px 18px;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
 }
 
 .metric-link {
@@ -338,9 +349,10 @@ h3 {
 }
 
 .panel {
-  padding: 18px;
-  margin-bottom: 14px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+  padding: 20px;
+  margin-bottom: 16px;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
 }
 
 .panel-head {
@@ -348,13 +360,15 @@ h3 {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(217, 224, 234, 0.8);
 }
 
 .form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 
 label {
