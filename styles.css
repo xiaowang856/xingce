@@ -284,6 +284,19 @@ h3 {
   padding: 18px;
 }
 
+.metric-link {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.metric-link:hover,
+.metric-link:focus-visible {
+  border-color: var(--brand);
+  box-shadow: 0 8px 18px rgba(23, 32, 51, 0.1);
+  outline: none;
+  transform: translateY(-1px);
+}
+
 .metric span {
   color: var(--muted);
   font-size: 13px;

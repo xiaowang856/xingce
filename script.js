@@ -832,6 +832,16 @@ function bindEvents() {
     button.addEventListener("click", () => switchView(button.dataset.view));
   });
 
+  document.querySelectorAll("[data-target-view]").forEach((card) => {
+    const openTargetView = () => switchView(card.dataset.targetView);
+    card.addEventListener("click", openTargetView);
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openTargetView();
+    });
+  });
+
   $("#topAvatarBtn").addEventListener("click", () => switchView("profile"));
 
   $("#dailyForm").addEventListener("submit", (event) => {
