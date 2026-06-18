@@ -24,10 +24,30 @@ body {
   margin: 0;
   min-height: 100vh;
   color: var(--ink);
-  background: var(--bg);
+  background:
+    linear-gradient(180deg, #f6f9fc 0%, #edf2f6 38%, #e8eff4 100%);
   font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
   display: grid;
   grid-template-columns: 240px 1fr;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.34)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(31, 111, 139, 0.03) 0,
+      rgba(31, 111, 139, 0.03) 1px,
+      transparent 1px,
+      transparent 120px
+    );
+  opacity: 0.45;
+  z-index: 0;
 }
 
 button,
@@ -39,10 +59,11 @@ select {
 .sidebar {
   min-height: 100vh;
   padding: 20px 14px;
-  background: #18394a;
+  background: linear-gradient(180deg, #17384a 0%, #102c3a 100%);
   color: #fff;
   position: sticky;
   top: 0;
+  z-index: 1;
 }
 
 .brand {
@@ -113,6 +134,11 @@ select {
 .app {
   padding: 24px clamp(16px, 2.2vw, 32px);
   min-width: 0;
+  position: relative;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.6) 100%);
+  backdrop-filter: blur(4px);
 }
 
 .topbar {
@@ -311,6 +337,7 @@ h3 {
 .panel {
   padding: 18px;
   margin-bottom: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
 }
 
 .panel-head {
