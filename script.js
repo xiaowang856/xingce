@@ -141,9 +141,13 @@ async function encryptLocalData(local, password, salt) {
 }
 
 async function decryptLocalData(payload, password, salt) {
-  const key = await deriveCryptoKey(password, salt);
-  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(payload.iv) }, key, base64ToBytes(payload.data));
-  return JSON.parse(new TextDecoder().decode(decrypted));
+  try {
+    const key = await deriveCryptoKey(password, salt);
+    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(payload.iv) }, key, base64ToBytes(payload.data));
+    return JSON.parse(new TextDecoder().decode(decrypted));
+  } catch {
+    throw new Error("同步密码不正确，无法读取云端数据");
+  }
 }
 
 function getSupabaseClient() {
@@ -818,7 +822,7 @@ async function runCloudAction(action) {
     showToast(action === loadCloudState ? "正在读取云端..." : "正在保存云端...");
     await action();
   } catch (error) {
-    showToast(error.message, "error");
+    showToast(error?.message || "操作失败，请检查用户名、同步密码和网络连接", "error");
   } finally {
     if (button) {
       button.disabled = false;
