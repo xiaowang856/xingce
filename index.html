@@ -189,6 +189,18 @@
             </label>
             <label class="wide">正确方法/公式<input name="method" type="text" /></label>
             <label class="wide">题源链接<input name="source" type="text" /></label>
+            <div class="wide form-field">
+              <span class="field-label">错题图片</span>
+              <div class="mistake-image-field">
+                <div id="mistakeImagePreview" class="mistake-image-preview is-empty">未上传图片</div>
+                <div class="mistake-image-actions">
+                  <button id="mistakeImageUploadBtn" class="ghost-btn" type="button">上传图片</button>
+                  <button id="mistakeImageRemoveBtn" class="ghost-btn danger" type="button">移除图片</button>
+                </div>
+                <input id="mistakeImageInput" class="file-input" type="file" accept="image/*" />
+                <input name="image" type="hidden" />
+              </div>
+            </div>
             <button id="mistakeSubmitBtn" class="primary-btn" type="submit">保存错题</button>
             <button id="cancelMistakeEditBtn" class="ghost-btn" type="button" hidden>取消编辑</button>
           </form>
@@ -311,6 +323,6 @@
     <script src="data.js?v=20260622-pdf-idioms"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="script.js?v=20260707-mistake-filter"></script>
+    <script src="script.js?v=20260707-mistake-image"></script>
   </body>
 </html>

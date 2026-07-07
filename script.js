@@ -273,6 +273,7 @@ function normalizeMistake(row) {
     reason: row["错因"] || row.reason || "",
     method: row["正确方法/公式"] || row.method || "",
     source: row["练习网站/题源链接"] || row.source || "",
+    image: row.image || row["\u56fe\u7247"] || "",
   };
 }
 
@@ -427,6 +428,7 @@ function renderMistakeTable(rows) {
           <th>错因</th>
           <th>正确方法</th>
           <th>题源</th>
+          <th>图片</th>
           <th>操作</th>
         </tr>
       </thead>
@@ -441,6 +443,7 @@ function renderMistakeTable(rows) {
                 <td>${escapeHtml(row.reason)}</td>
                 <td>${escapeHtml(row.method)}</td>
                 <td>${escapeHtml(row.source)}</td>
+                <td>${row.image ? `<a href="${escapeHtml(row.image)}" target="_blank" rel="noreferrer"><img class="mistake-thumb" src="${escapeHtml(row.image)}" alt="\u9519\u9898\u56fe\u7247" /></a>` : `<span class="muted">\u65e0</span>`}</td>
                 <td>
                   ${
                     row.id
@@ -588,7 +591,7 @@ function updateMistakeTypeOptions(selectedType = "") {
   if (!form) return;
   const module = form.elements.module.value;
   const typeSelect = form.elements.type;
-  const options = mistakeTypeOptions[module] || [module || "\u5176\u4ed6", "\u5176\u4ed6"];
+  const options = (mistakeTypeOptions[module] || [module || "\u5176\u4ed6", "\u5176\u4ed6"]).slice();
   if (selectedType && !options.includes(selectedType)) options.push(selectedType);
   const nextValue = selectedType && options.includes(selectedType) ? selectedType : options[0];
   typeSelect.innerHTML = options.map((option) => `<option>${escapeHtml(option)}</option>`).join("");
@@ -796,6 +799,53 @@ function importJsonFile(file) {
   reader.readAsText(file, "utf-8");
 }
 
+function setMistakeImagePreview(image = "") {
+  const form = $("#mistakeForm");
+  const preview = $("#mistakeImagePreview");
+  if (form?.elements.image) form.elements.image.value = image;
+  if (!preview) return;
+  if (image) {
+    preview.classList.remove("is-empty");
+    preview.innerHTML = `<a href="${escapeHtml(image)}" target="_blank" rel="noreferrer"><img src="${escapeHtml(image)}" alt="\u9519\u9898\u56fe\u7247" /></a>`;
+  } else {
+    preview.classList.add("is-empty");
+    preview.textContent = "\u672a\u4e0a\u4f20\u56fe\u7247";
+  }
+}
+
+function importMistakeImageFile(file) {
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    showToast("\u8bf7\u9009\u62e9\u56fe\u7247\u6587\u4ef6", "error");
+    return;
+  }
+  const image = new Image();
+  const url = URL.createObjectURL(file);
+  image.addEventListener("load", () => {
+    const maxSide = 1280;
+    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+    setMistakeImagePreview(canvas.toDataURL("image/jpeg", 0.86));
+    $("#mistakeImageInput").value = "";
+    URL.revokeObjectURL(url);
+    showToast("\u9519\u9898\u56fe\u7247\u5df2\u4e0a\u4f20");
+  });
+  image.addEventListener("error", () => {
+    showToast("\u56fe\u7247\u8bfb\u53d6\u5931\u8d25", "error");
+    $("#mistakeImageInput").value = "";
+    URL.revokeObjectURL(url);
+  });
+  image.src = url;
+}
+
 function importAvatarFile(file) {
   if (!file) return;
   if (!file.type.startsWith("image/")) {
@@ -955,6 +1005,17 @@ function bindEvents() {
     }
   });
 
+  $("#mistakeImageUploadBtn").addEventListener("click", () => {
+    showToast("\u8bf7\u9009\u62e9\u9519\u9898\u56fe\u7247");
+    $("#mistakeImageInput").click();
+  });
+  $("#mistakeImageInput").addEventListener("change", (event) => {
+    importMistakeImageFile(event.currentTarget.files?.[0]);
+  });
+  $("#mistakeImageRemoveBtn").addEventListener("click", () => {
+    setMistakeImagePreview("");
+    showToast("\u9519\u9898\u56fe\u7247\u5df2\u79fb\u9664");
+  });
   $("#cancelMistakeEditBtn").addEventListener("click", resetMistakeEditState);
 
   ["idiomSearch", "idiomTone", "idiomStatus"].forEach((id) => {
@@ -1059,6 +1120,7 @@ function resetMistakeEditState() {
   state.editingMistakeId = "";
   const form = $("#mistakeForm");
   if (form) form.reset();
+  setMistakeImagePreview("");
   updateMistakeTypeOptions();
   setDefaultDates();
   syncMistakeEditState();
@@ -1073,6 +1135,7 @@ function fillMistakeForm(row) {
   form.elements.reason.value = row.reason || "";
   form.elements.method.value = row.method || "";
   form.elements.source.value = row.source || "";
+  setMistakeImagePreview(row.image || "");
   state.editingMistakeId = row.id || "";
   syncMistakeEditState();
 }
