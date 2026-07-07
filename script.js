@@ -35,6 +35,13 @@ const titles = {
   profile: "个人设置",
 };
 
+const mistakeTypeOptions = {
+  "\u8a00\u8bed\u7406\u89e3": ["\u8a00\u8bed\u7406\u89e3", "\u903b\u8f91\u586b\u7a7a", "\u7247\u6bb5\u9605\u8bfb", "\u8bed\u53e5\u8868\u8fbe", "\u7bc7\u7ae0\u9605\u8bfb", "\u5176\u4ed6"],
+  "\u6570\u91cf\u5173\u7cfb": ["\u6570\u91cf\u5173\u7cfb", "\u5de5\u7a0b\u95ee\u9898", "\u884c\u7a0b\u95ee\u9898", "\u7ecf\u6d4e\u5229\u6da6", "\u6392\u5217\u7ec4\u5408\u4e0e\u6982\u7387", "\u51e0\u4f55\u95ee\u9898", "\u6700\u503c\u95ee\u9898", "\u5176\u4ed6"],
+  "\u5224\u65ad\u63a8\u7406": ["\u5224\u65ad\u63a8\u7406", "\u56fe\u5f62\u63a8\u7406", "\u5b9a\u4e49\u5224\u65ad", "\u7c7b\u6bd4\u63a8\u7406", "\u903b\u8f91\u5224\u65ad", "\u5176\u4ed6"],
+  "\u8d44\u6599\u5206\u6790": ["\u8d44\u6599\u5206\u6790", "\u589e\u957f\u7387", "\u6bd4\u91cd", "\u500d\u6570\u4e0e\u5e73\u5747\u6570", "\u7efc\u5408\u8d44\u6599\u5206\u6790", "\u5176\u4ed6"],
+  "\u5e38\u8bc6\u5224\u65ad": ["\u5e38\u8bc6\u5224\u65ad", "\u653f\u6cbb\u5e38\u8bc6", "\u6cd5\u5f8b\u5e38\u8bc6", "\u7ecf\u6d4e\u5e38\u8bc6", "\u79d1\u6280\u5e38\u8bc6", "\u4eba\u6587\u5386\u53f2", "\u5730\u7406\u56fd\u60c5", "\u5176\u4ed6"],
+};
 function $(selector) {
   return document.querySelector(selector);
 }
@@ -576,6 +583,17 @@ function serializeForm(form) {
   return Object.fromEntries(new FormData(form).entries());
 }
 
+function updateMistakeTypeOptions(selectedType = "") {
+  const form = $("#mistakeForm");
+  if (!form) return;
+  const module = form.elements.module.value;
+  const typeSelect = form.elements.type;
+  const options = mistakeTypeOptions[module] || [module || "\u5176\u4ed6", "\u5176\u4ed6"];
+  if (selectedType && !options.includes(selectedType)) options.push(selectedType);
+  const nextValue = selectedType && options.includes(selectedType) ? selectedType : options[0];
+  typeSelect.innerHTML = options.map((option) => `<option>${escapeHtml(option)}</option>`).join("");
+  typeSelect.value = nextValue;
+}
 function setDefaultDates() {
   document.querySelectorAll('input[type="date"]').forEach((input) => {
     if (!input.value) input.value = today();
@@ -871,6 +889,9 @@ function bindEvents() {
     setDefaultDates();
   });
 
+  updateMistakeTypeOptions();
+  $("#mistakeForm").elements.module.addEventListener("change", () => updateMistakeTypeOptions());
+
   $("#mistakeForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const form = serializeForm(event.currentTarget);
@@ -1038,6 +1059,7 @@ function resetMistakeEditState() {
   state.editingMistakeId = "";
   const form = $("#mistakeForm");
   if (form) form.reset();
+  updateMistakeTypeOptions();
   setDefaultDates();
   syncMistakeEditState();
 }
@@ -1047,7 +1069,7 @@ function fillMistakeForm(row) {
   if (!form || !row) return;
   form.elements.date.value = row.date || "";
   form.elements.module.value = row.module || "";
-  form.elements.type.value = row.type || "";
+  updateMistakeTypeOptions(row.type || "");
   form.elements.reason.value = row.reason || "";
   form.elements.method.value = row.method || "";
   form.elements.source.value = row.source || "";
