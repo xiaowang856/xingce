@@ -73,6 +73,14 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function withTimeout(promise, message, timeoutMs = 15000) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 function emptyLocal() {
   return {
     daily: [],
@@ -416,6 +424,16 @@ function table(headers, rows) {
   `;
 }
 
+function isInlineImage(value) {
+  return String(value || "").startsWith("data:image/");
+}
+
+function mistakeImageCell(row) {
+  if (!row.image) return `<span class="muted">无</span>`;
+  if (isInlineImage(row.image)) return `<span class="muted">已上传</span>`;
+  return `<a href="${escapeHtml(row.image)}" target="_blank" rel="noreferrer"><img class="mistake-thumb" src="${escapeHtml(row.image)}" alt="错题图片" loading="lazy" /></a>`;
+}
+
 function renderMistakeTable(rows) {
   if (!rows.length) {
     return `<div class="focus-item"><p>暂无记录。</p></div>`;
@@ -445,7 +463,7 @@ function renderMistakeTable(rows) {
                 <td>${escapeHtml(row.reason)}</td>
                 <td>${escapeHtml(row.method)}</td>
                 <td>${escapeHtml(row.source)}</td>
-                <td>${row.image ? `<a href="${escapeHtml(row.image)}" target="_blank" rel="noreferrer"><img class="mistake-thumb" src="${escapeHtml(row.image)}" alt="\u9519\u9898\u56fe\u7247" /></a>` : `<span class="muted">\u65e0</span>`}</td>
+                <td>${mistakeImageCell(row)}</td>
                 <td>
                   ${
                     row.id
@@ -934,7 +952,7 @@ async function runCloudAction(action) {
       button.textContent = action === loadCloudState ? "读取中..." : "保存中...";
     }
     showToast(action === loadCloudState ? "正在读取云端..." : "正在保存云端...");
-    await action();
+    await withTimeout(action(), action === loadCloudState ? "读取云端超时，请检查网络或稍后再试" : "保存云端超时，请检查网络或稍后再试", 20000);
   } catch (error) {
     showToast(error?.message || "操作失败，请检查用户名、同步密码和网络连接", "error");
   } finally {
