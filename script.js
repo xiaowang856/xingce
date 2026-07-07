@@ -292,7 +292,7 @@ function normalizeShenlun(row) {
 }
 
 function allDaily() {
-  return [...state.base.dailyCheckin.map(normalizeDaily), ...state.local.daily];
+  return state.local.daily;
 }
 
 function allMistakes() {
@@ -474,7 +474,11 @@ function includesRow(row, keyword) {
 
 function renderDaily() {
   const keyword = $("#dailySearch").value.trim();
-  const rows = allDaily().filter((row) => includesRow(row, keyword));
+  const selectedDate = $("#dailyDateFilter")?.value || "";
+  const rows = allDaily().filter((row) => {
+    const matchesDate = !selectedDate || String(row.date || "").slice(0, 10) === selectedDate;
+    return matchesDate && includesRow(row, keyword);
+  });
   $("#dailyTable").innerHTML = table(
     [
       { key: "date", label: "日期" },
@@ -1017,9 +1021,9 @@ function bindEvents() {
     setDefaultDates();
   });
 
-  ["dailySearch", "mistakeSearch", "shenlunSearch"].forEach((id) => {
+  ["dailySearch", "dailyDateFilter", "mistakeSearch", "shenlunSearch"].forEach((id) => {
     $(`#${id}`).addEventListener("input", () => {
-      if (id === "dailySearch") renderDaily();
+      if (id === "dailySearch" || id === "dailyDateFilter") renderDaily();
       if (id === "mistakeSearch") renderMistakes();
       if (id === "shenlunSearch") renderShenlun();
     });
