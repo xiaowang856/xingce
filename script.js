@@ -5,6 +5,7 @@ const SYNC_PASSWORD_KEY = "civil-service-study-sync-password-v1";
 const IDIOM_API_URL = "https://raw.githubusercontent.com/pwxcoo/chinese-xinhua/master/data/idiom.json";
 const DEFAULT_USER_ID = "默认用户";
 const CLOUD_TABLE = "study_profiles";
+const MISTAKE_IMAGE_BUCKET = "mistake-images";
 
 const state = {
   base: null,
@@ -274,6 +275,7 @@ function normalizeMistake(row) {
     method: row["正确方法/公式"] || row.method || "",
     source: row["练习网站/题源链接"] || row.source || "",
     image: row.image || row["\u56fe\u7247"] || "",
+    imagePath: row.imagePath || row["image_path"] || "",
   };
 }
 
@@ -799,10 +801,11 @@ function importJsonFile(file) {
   reader.readAsText(file, "utf-8");
 }
 
-function setMistakeImagePreview(image = "") {
+function setMistakeImagePreview(image = "", imagePath = "") {
   const form = $("#mistakeForm");
   const preview = $("#mistakeImagePreview");
   if (form?.elements.image) form.elements.image.value = image;
+  if (form?.elements.imagePath) form.elements.imagePath.value = imagePath;
   if (!preview) return;
   if (image) {
     preview.classList.remove("is-empty");
@@ -810,6 +813,36 @@ function setMistakeImagePreview(image = "") {
   } else {
     preview.classList.add("is-empty");
     preview.textContent = "\u672a\u4e0a\u4f20\u56fe\u7247";
+  }
+}
+
+function userStorageFolder() {
+  return encodeURIComponent(currentUserId()).replace(/%/g, "_");
+}
+
+function canvasToJpegBlob(canvas, quality = 0.86) {
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+}
+
+async function uploadMistakeImageBlob(blob) {
+  const supabase = getSupabaseClient();
+  const path = `${userStorageFolder()}/${createRecordId("img")}.jpg`;
+  const { error } = await supabase.storage.from(MISTAKE_IMAGE_BUCKET).upload(path, blob, {
+    contentType: "image/jpeg",
+    upsert: false,
+  });
+  if (error) throw new Error(error.message);
+  const { data } = supabase.storage.from(MISTAKE_IMAGE_BUCKET).getPublicUrl(path);
+  if (!data?.publicUrl) throw new Error("\u56fe\u7247\u94fe\u63a5\u751f\u6210\u5931\u8d25");
+  return { url: data.publicUrl, path };
+}
+
+async function deleteMistakeImagePath(path) {
+  if (!path) return;
+  try {
+    await getSupabaseClient().storage.from(MISTAKE_IMAGE_BUCKET).remove([path]);
+  } catch {
+    // Deleting the storage file is best-effort; the saved mistake data is the source of truth.
   }
 }
 
@@ -821,22 +854,31 @@ function importMistakeImageFile(file) {
   }
   const image = new Image();
   const url = URL.createObjectURL(file);
-  image.addEventListener("load", () => {
-    const maxSide = 1280;
-    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
-    const width = Math.max(1, Math.round(image.naturalWidth * scale));
-    const height = Math.max(1, Math.round(image.naturalHeight * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext("2d");
-    context.fillStyle = "#fff";
-    context.fillRect(0, 0, width, height);
-    context.drawImage(image, 0, 0, width, height);
-    setMistakeImagePreview(canvas.toDataURL("image/jpeg", 0.86));
-    $("#mistakeImageInput").value = "";
-    URL.revokeObjectURL(url);
-    showToast("\u9519\u9898\u56fe\u7247\u5df2\u4e0a\u4f20");
+  image.addEventListener("load", async () => {
+    try {
+      showToast("\u6b63\u5728\u4e0a\u4f20\u9519\u9898\u56fe\u7247...");
+      const maxSide = 1280;
+      const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+      const width = Math.max(1, Math.round(image.naturalWidth * scale));
+      const height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, width, height);
+      context.drawImage(image, 0, 0, width, height);
+      const blob = await canvasToJpegBlob(canvas);
+      if (!blob) throw new Error("\u56fe\u7247\u538b\u7f29\u5931\u8d25");
+      const uploaded = await uploadMistakeImageBlob(blob);
+      setMistakeImagePreview(uploaded.url, uploaded.path);
+      showToast("\u9519\u9898\u56fe\u7247\u5df2\u4e0a\u4f20\u5230\u4e91\u7aef");
+    } catch (error) {
+      showToast(`\u56fe\u7247\u4e0a\u4f20\u5931\u8d25\uff1a${error.message}`, "error");
+    } finally {
+      $("#mistakeImageInput").value = "";
+      URL.revokeObjectURL(url);
+    }
   });
   image.addEventListener("error", () => {
     showToast("\u56fe\u7247\u8bfb\u53d6\u5931\u8d25", "error");
@@ -997,6 +1039,7 @@ function bindEvents() {
     if (mistakeAction === "delete") {
       if (!confirm("确定删除这条错题吗？")) return;
       state.local.mistakes = state.local.mistakes.filter((item) => item.id !== mistakeId);
+      deleteMistakeImagePath(row.imagePath);
       if (state.editingMistakeId === mistakeId) resetMistakeEditState();
       saveLocal();
       renderMistakes();
@@ -1013,7 +1056,7 @@ function bindEvents() {
     importMistakeImageFile(event.currentTarget.files?.[0]);
   });
   $("#mistakeImageRemoveBtn").addEventListener("click", () => {
-    setMistakeImagePreview("");
+    setMistakeImagePreview("", "");
     showToast("\u9519\u9898\u56fe\u7247\u5df2\u79fb\u9664");
   });
   $("#cancelMistakeEditBtn").addEventListener("click", resetMistakeEditState);
@@ -1120,7 +1163,7 @@ function resetMistakeEditState() {
   state.editingMistakeId = "";
   const form = $("#mistakeForm");
   if (form) form.reset();
-  setMistakeImagePreview("");
+  setMistakeImagePreview("", "");
   updateMistakeTypeOptions();
   setDefaultDates();
   syncMistakeEditState();
@@ -1135,7 +1178,7 @@ function fillMistakeForm(row) {
   form.elements.reason.value = row.reason || "";
   form.elements.method.value = row.method || "";
   form.elements.source.value = row.source || "";
-  setMistakeImagePreview(row.image || "");
+  setMistakeImagePreview(row.image || "", row.imagePath || "");
   state.editingMistakeId = row.id || "";
   syncMistakeEditState();
 }
