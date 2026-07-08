@@ -13,6 +13,7 @@ const state = {
   remoteIdioms: null,
   supabase: null,
   editingMistakeId: "",
+  editingDailyId: "",
   local: {
     daily: [],
     mistakes: [],
@@ -74,6 +75,18 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function nowMinute() {
+  const date = new Date();
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
+function displayDateTime(value) {
+  const text = String(value || "");
+  if (text.includes("T")) return text.replace("T", " ");
+  return text;
+}
+
 function withTimeout(promise, message, timeoutMs = 15000) {
   let timer;
   const timeout = new Promise((_, reject) => {
@@ -101,12 +114,20 @@ function createRecordId(prefix = "r") {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function ensureRecordIds(list, prefix) {
+  return (Array.isArray(list) ? list : []).map((item) => (item?.id ? item : { ...item, id: createRecordId(prefix) }));
+}
+
+function hasRecordWithoutId(list) {
+  return Array.isArray(list) && list.some((item) => item && !item.id);
+}
+
 function ensureMistakeIds(list) {
-  return (Array.isArray(list) ? list : []).map((item) => (item?.id ? item : { ...item, id: createRecordId("m") }));
+  return ensureRecordIds(list, "m");
 }
 
 function hasMistakeWithoutId(list) {
-  return Array.isArray(list) && list.some((item) => item && !item.id);
+  return hasRecordWithoutId(list);
 }
 
 function currentUserId() {
@@ -227,15 +248,18 @@ function loadLocal() {
   const raw = localStorage.getItem(key);
   state.local = emptyLocal();
   state.editingMistakeId = "";
+  state.editingDailyId = "";
   if (!raw) {
     saveLocal();
     return;
   }
   try {
     state.local = { ...state.local, ...JSON.parse(raw) };
+    const shouldPersistDailyIds = hasRecordWithoutId(state.local.daily);
     const shouldPersistMistakeIds = hasMistakeWithoutId(state.local.mistakes);
+    state.local.daily = ensureRecordIds(state.local.daily, "d");
     state.local.mistakes = ensureMistakeIds(state.local.mistakes);
-    if (shouldPersistMistakeIds) saveLocal();
+    if (shouldPersistDailyIds || shouldPersistMistakeIds) saveLocal();
   } catch {
     localStorage.removeItem(storageKey());
   }
@@ -253,6 +277,7 @@ function normalizeImportedLocal(value) {
   }
   const imported = value.local && typeof value.local === "object" ? value.local : value;
   const normalized = { ...emptyLocal(), ...imported };
+  normalized.daily = ensureRecordIds(normalized.daily, "d");
   normalized.mistakes = ensureMistakeIds(normalized.mistakes);
   return normalized;
 }
@@ -367,7 +392,7 @@ function renderDashboard() {
   $("#idiomCount").textContent = allIdiomEntries().length;
   $("#mistakeCount").textContent = allMistakes().length;
   $("#shenlunCount").textContent = allShenlun().length;
-  const todayRecord = allDaily().find((row) => row.date === today());
+  const todayRecord = allDaily().find((row) => String(row.date || "").slice(0, 10) === today());
   $("#todayStatus").textContent = todayRecord ? "已记录" : "未记录";
 
   $("#focusList").innerHTML = state.base.focusList
@@ -425,6 +450,54 @@ function table(headers, rows) {
   `;
 }
 
+function renderDailyTable(rows) {
+  if (!rows.length) {
+    return `<div class="focus-item"><p>暂无记录。</p></div>`;
+  }
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>时长</th>
+          <th>模块</th>
+          <th>题量</th>
+          <th>正确</th>
+          <th>正确率</th>
+          <th>申论任务</th>
+          <th>问题</th>
+          <th>调整</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            (row) => `
+              <tr>
+                <td>${escapeHtml(displayDateTime(row.date))}</td>
+                <td>${escapeHtml(row.minutes)}</td>
+                <td>${escapeHtml(row.module)}</td>
+                <td>${escapeHtml(row.total)}</td>
+                <td>${escapeHtml(row.correct)}</td>
+                <td>${escapeHtml(row.rate)}</td>
+                <td>${escapeHtml(row.shenlunTask)}</td>
+                <td>${escapeHtml(row.problem)}</td>
+                <td>${escapeHtml(row.adjust)}</td>
+                <td>
+                  <div class="table-actions">
+                    <button class="small-btn" data-daily-action="edit" data-daily-id="${escapeHtml(row.id)}" type="button">编辑</button>
+                    <button class="small-btn danger-btn" data-daily-action="delete" data-daily-id="${escapeHtml(row.id)}" type="button">删除</button>
+                  </div>
+                </td>
+              </tr>
+            `,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
+}
 function isInlineImage(value) {
   return String(value || "").startsWith("data:image/");
 }
@@ -498,22 +571,8 @@ function renderDaily() {
     const matchesDate = !selectedDate || String(row.date || "").slice(0, 10) === selectedDate;
     return matchesDate && includesRow(row, keyword);
   });
-  $("#dailyTable").innerHTML = table(
-    [
-      { key: "date", label: "日期" },
-      { key: "minutes", label: "时长" },
-      { key: "module", label: "模块" },
-      { key: "total", label: "题量" },
-      { key: "correct", label: "正确" },
-      { key: "rate", label: "正确率" },
-      { key: "shenlunTask", label: "申论任务" },
-      { key: "problem", label: "问题" },
-      { key: "adjust", label: "调整" },
-    ],
-    rows,
-  );
+  $("#dailyTable").innerHTML = renderDailyTable(rows);
 }
-
 function renderMistakes() {
   const keyword = $("#mistakeSearch").value.trim();
   const rows = allMistakes().filter((row) => includesRow(row, keyword));
@@ -624,7 +683,7 @@ function updateMistakeTypeOptions(selectedType = "") {
 }
 function setDefaultDates() {
   const dailyDate = $("#dailyForm")?.elements.date;
-  if (dailyDate) dailyDate.value = today();
+  if (dailyDate) dailyDate.value = nowMinute();
   document.querySelectorAll('input[type="date"]').forEach((input) => {
     if (!input.value) input.value = today();
   });
@@ -705,7 +764,8 @@ async function saveCloudState(options = {}) {
 async function autoSaveCloudState(reason) {
   if (!canUseCloudSync()) return;
   try {
-    await saveCloudState({ silent: true });
+    if (reason) showToast(`${reason}，正在同步云端...`);
+    await withTimeout(saveCloudState({ silent: true }), "自动同步云端超时，请稍后再试", 20000);
     if (reason) showToast(`${reason}，已自动同步云端`);
   } catch (error) {
     showToast(`${reason || "本地已保存"}，但自动同步失败：${error.message}`, "error");
@@ -994,10 +1054,11 @@ function bindEvents() {
 
   $("#dailyForm").addEventListener("submit", (event) => {
     event.preventDefault();
+    const wasEditingDaily = Boolean(state.editingDailyId);
     const form = serializeForm(event.currentTarget);
     const total = Number(form.total || 0);
     const correct = Number(form.correct || 0);
-    state.local.daily.unshift({
+    const record = {
       date: form.date,
       minutes: form.minutes,
       module: form.module,
@@ -1007,14 +1068,28 @@ function bindEvents() {
       shenlunTask: form.shenlunTask,
       problem: form.problem,
       adjust: form.adjust,
-    });
+    };
+    if (state.editingDailyId) {
+      const index = state.local.daily.findIndex((item) => item.id === state.editingDailyId);
+      if (index >= 0) {
+        state.local.daily[index] = { ...state.local.daily[index], ...record, id: state.editingDailyId };
+        showToast("打卡已更新");
+      } else {
+        state.local.daily.unshift({ ...record, id: createRecordId("d") });
+        showToast("打卡已保存");
+      }
+    } else {
+      state.local.daily.unshift({ ...record, id: createRecordId("d") });
+      showToast("打卡已保存");
+    }
     saveLocal();
     renderDaily();
     renderDashboard();
-    event.currentTarget.reset();
-    setDefaultDates();
-    autoSaveCloudState("打卡已保存");
+    resetDailyEditState();
+    autoSaveCloudState(wasEditingDaily ? "打卡已更新" : "打卡已保存");
   });
+
+  $("#cancelDailyEditBtn").addEventListener("click", resetDailyEditState);
 
   updateMistakeTypeOptions();
   $("#mistakeForm").elements.module.addEventListener("change", () => updateMistakeTypeOptions());
@@ -1060,6 +1135,29 @@ function bindEvents() {
       if (id === "mistakeSearch") renderMistakes();
       if (id === "shenlunSearch") renderShenlun();
     });
+  });
+
+  $("#dailyTable").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-daily-action]");
+    if (!button) return;
+    const { dailyAction, dailyId } = button.dataset;
+    const row = state.local.daily.find((item) => item.id === dailyId);
+    if (!row) return;
+    if (dailyAction === "edit") {
+      fillDailyForm(row);
+      showToast("已载入到打卡编辑区");
+      return;
+    }
+    if (dailyAction === "delete") {
+      if (!confirm("确定删除这条打卡记录吗？")) return;
+      state.local.daily = state.local.daily.filter((item) => item.id !== dailyId);
+      if (state.editingDailyId === dailyId) resetDailyEditState();
+      saveLocal();
+      renderDaily();
+      renderDashboard();
+      showToast("打卡已删除");
+      autoSaveCloudState("打卡已删除");
+    }
   });
 
   $("#mistakeTable").addEventListener("click", (event) => {
@@ -1200,6 +1298,35 @@ function syncMistakeEditState() {
   if (cancelBtn) cancelBtn.hidden = !editing;
 }
 
+function syncDailyEditState() {
+  const submit = $("#dailySubmitBtn");
+  const cancel = $("#cancelDailyEditBtn");
+  if (submit) submit.textContent = state.editingDailyId ? "更新打卡" : "保存打卡";
+  if (cancel) cancel.hidden = !state.editingDailyId;
+}
+
+function resetDailyEditState() {
+  state.editingDailyId = "";
+  const form = $("#dailyForm");
+  if (form) form.reset();
+  setDefaultDates();
+  syncDailyEditState();
+}
+
+function fillDailyForm(row) {
+  const form = $("#dailyForm");
+  if (!form || !row) return;
+  form.elements.date.value = row.date?.includes("T") ? row.date : `${String(row.date || today()).slice(0, 10)}T${nowMinute().slice(11)}`;
+  form.elements.minutes.value = row.minutes || "";
+  form.elements.module.value = row.module || "";
+  form.elements.total.value = row.total ?? "";
+  form.elements.correct.value = row.correct ?? "";
+  form.elements.shenlunTask.value = row.shenlunTask || "";
+  form.elements.problem.value = row.problem || "";
+  form.elements.adjust.value = row.adjust || "";
+  state.editingDailyId = row.id || "";
+  syncDailyEditState();
+}
 function resetMistakeEditState() {
   state.editingMistakeId = "";
   const form = $("#mistakeForm");
