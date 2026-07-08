@@ -57,6 +57,7 @@ function escapeHtml(value) {
 }
 
 let toastTimer = null;
+let autoSaveTimer = null;
 
 function showToast(message, type = "success") {
   const toast = $("#toast");
@@ -705,10 +706,18 @@ async function autoSaveCloudState(reason) {
   if (!canUseCloudSync()) return;
   try {
     await saveCloudState({ silent: true });
-    if (reason) showToast(`${reason}，已同步云端`);
+    if (reason) showToast(`${reason}，已自动同步云端`);
   } catch (error) {
-    showToast(`${reason || "本地已保存"}，但云端同步失败：${error.message}`, "error");
+    showToast(`${reason || "本地已保存"}，但自动同步失败：${error.message}`, "error");
   }
+}
+
+function scheduleAutoSaveCloudState(reason, delay = 1200) {
+  if (!canUseCloudSync()) return;
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    autoSaveCloudState(reason);
+  }, delay);
 }
 
 function matchRemoteIdiom(row, word) {
@@ -812,6 +821,7 @@ function importJsonFile(file) {
       saveLocal();
       renderAll();
       showToast(`已导入 ${importedUserId} 的数据`);
+      autoSaveCloudState("导入数据已保存");
     } catch (error) {
       showToast(`导入失败：${error.message}`, "error");
     } finally {
@@ -1003,6 +1013,7 @@ function bindEvents() {
     renderDashboard();
     event.currentTarget.reset();
     setDefaultDates();
+    autoSaveCloudState("打卡已保存");
   });
 
   updateMistakeTypeOptions();
@@ -1028,6 +1039,7 @@ function bindEvents() {
     renderMistakes();
     renderDashboard();
     resetMistakeEditState();
+    autoSaveCloudState("错题已保存");
   });
 
   $("#shenlunForm").addEventListener("submit", (event) => {
@@ -1039,6 +1051,7 @@ function bindEvents() {
     renderDashboard();
     event.currentTarget.reset();
     setDefaultDates();
+    autoSaveCloudState("申论记录已保存");
   });
 
   ["dailySearch", "dailyDateFilter", "mistakeSearch", "shenlunSearch"].forEach((id) => {
@@ -1069,6 +1082,7 @@ function bindEvents() {
       renderMistakes();
       renderDashboard();
       showToast("错题已删除");
+      autoSaveCloudState("错题已删除");
     }
   });
 
@@ -1105,6 +1119,7 @@ function bindEvents() {
     state.local.idiomStatus[button.dataset.idiom] = button.dataset.status;
     saveLocal();
     renderIdioms();
+    scheduleAutoSaveCloudState("成语状态已保存");
   });
 
   $("#idiomCards").addEventListener("input", (event) => {
@@ -1118,6 +1133,7 @@ function bindEvents() {
       delete state.local.idiomNotes[idiom];
     }
     saveLocal();
+    scheduleAutoSaveCloudState("成语笔记已保存", 1800);
   });
 
   $("#userIdInput").addEventListener("change", () => {
@@ -1161,6 +1177,7 @@ function bindEvents() {
     state.local = emptyLocal();
     renderAll();
     showToast("本地记录已清空");
+    autoSaveCloudState("本地记录已清空");
   });
 }
 
