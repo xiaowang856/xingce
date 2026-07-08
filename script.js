@@ -622,6 +622,8 @@ function updateMistakeTypeOptions(selectedType = "") {
   typeSelect.value = nextValue;
 }
 function setDefaultDates() {
+  const dailyDate = $("#dailyForm")?.elements.date;
+  if (dailyDate) dailyDate.value = today();
   document.querySelectorAll('input[type="date"]').forEach((input) => {
     if (!input.value) input.value = today();
   });
